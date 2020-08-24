@@ -1,0 +1,1 @@
+blade build :* --bundle=debug
