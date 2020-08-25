@@ -81,6 +81,14 @@ class NodeM: public Node {
         auto node_2 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-2-", 3), {node_1.get()}); // node_2 依赖 node_1
         auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get()});
         sub_graph->create_edges(new NodeDemo("4", 3), {});
+        sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+          std::cout << "lambda start\n";
+          usleep(1);
+          std::cout << "lambda end\n"; 
+        }, name_for_debug + "-lambda-"), {});
+        sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+          sub_graph->create_edges(new NodeDemo("xxxxx-8-", 2), {});
+        }, name_for_debug + "-lambda-"), {});
 
         require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 

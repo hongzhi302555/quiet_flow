@@ -83,4 +83,26 @@ class Node {
     void append_upstreams(const Node*);
     std::string node_debug_name(std::string postfix="") const;
 };
+
+class LambdaNode: public Node {
+public:
+    template<typename Callable>
+    LambdaNode(Callable &&callable, std::string debug_name="")
+    : lambda_holder([sub_graph=this->get_graph(), callable=std::move(callable)]() {
+        callable(sub_graph);
+    }) {
+      name_for_debug = debug_name;
+    }
+
+protected:
+    virtual void run(){
+      lambda_holder();
+      wait_graph(this->get_graph());
+    }
+
+private:
+    std::function<void()> lambda_holder;
+};
+
+
 }
