@@ -8,6 +8,7 @@ cc_library(
     ],
     deps=[
         "cpp3rdlib/folly:v2018.08.20.00@//cpp3rdlib/folly:folly",
+        "cpputil/metrics2:1.0.0@//cpputil/metrics2:metrics2",
         "cpp3rdlib/concurrentqueue:master@//cpp3rdlib/concurrentqueue:concurrentqueue"
     ],
     extra_cppflags = [
@@ -16,7 +17,6 @@ cc_library(
         "-g",
         "-fopenmp",
         #"-D QUIET_FLOW_DEBUG",
-        #"-D QUIET_FLOW_DUMP_GRAPH",
         "-Wall", "-Wextra", "-Werror",
         "-Wno-unused-local-typedefs",
         "-Wno-unused-function",

@@ -6,6 +6,8 @@
 #include "head/node.h"
 #include "head/schedule.h"
 
+DECLARE_bool(enable_qf_dump_graph);
+
 namespace quiet_flow{
 const size_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
@@ -17,7 +19,10 @@ Graph::~Graph() {
 }
 
 void Graph::clear_graph(){
-    #ifndef QUIET_FLOW_DUMP_GRAPH
+    if (FLAGS_enable_qf_dump_graph) {
+        return;
+    }
+
     std::vector<Node*> required_nodes;
     get_nodes(required_nodes);
 
@@ -38,7 +43,6 @@ void Graph::clear_graph(){
     }
     nodes.clear();
     fast_nodes.clear();
-    #endif
 }
 
 void Graph::get_nodes(std::vector<Node*>& required_nodes) {
@@ -153,28 +157,28 @@ int Node::add_downstream(Node* node) {
 }
 
 void Node::append_upstreams(const Node* node) {
-    #ifdef QUIET_FLOW_DUMP_GRAPH 
-
-    up_streams.push_back(node);
-
-    #else
-
-    if (FLAGS_enable_qf_check_circle) {
+    if (FLAGS_enable_qf_check_circle || FLAGS_enable_qf_dump_graph) {
         up_streams.push_back(node);
     }
-
-    #endif
 }
 
 std::string Graph::dump(bool is_root) {
-    #ifdef QUIET_FLOW_DUMP_GRAPH
+    if (!FLAGS_enable_qf_dump_graph) {
+        return "";
+    }
+
     static const std::string wait_edge = "[color=black]";
+    static const std::string wait_edge1 = "[color=blue]";
+    static const std::string wait_edge2 = "[color=red]";
+    static const std::string wait_edge3 = "[color=green]";
+    static const std::string back_edge = "[style=dashed, color=gray]";
     static const std::string nowait_edge = "[color=gray]";
     static const std::string virtual_edge = "[style=dotted, color=gray]";
 
     std::vector<Node*> required_nodes;
     get_nodes(required_nodes);
 
+    // 将所有节点分类到子图
     std::unordered_map<long int, std::unordered_set<const Node*>> sub_graph_map;
     for (auto node: required_nodes) {
         if (sub_graph_map.find((long int)node->parent_graph) == sub_graph_map.end()) {
@@ -186,7 +190,6 @@ std::string Graph::dump(bool is_root) {
         }
     }
 
-    std::unordered_map<long int, bool> node_back_flag_map;
     std::unordered_map<std::string, bool> edge_back_flag_map;
     std::unordered_map<std::string, std::string> edge_color_map;
     for (auto node: required_nodes) {
@@ -196,10 +199,6 @@ std::string Graph::dump(bool is_root) {
                 need_back_node = true;
                 continue;
             }
-            if (need_back_node) {
-                node_back_flag_map[(long int)node] = true;
-            }
-
             if (sub_graph_map.find((long int)node->parent_graph) == sub_graph_map.end()) {
                 std::unordered_set<const Node*> t_;
                 t_.emplace(up_node);
@@ -209,12 +208,18 @@ std::string Graph::dump(bool is_root) {
             }
 
             std::ostringstream oss_edge;
-            oss_edge << (long int)up_node << "->" << (long int)node;
+            if (up_node->require_sub_graph) {
+                // 画图缀个 1
+                oss_edge << (long int)up_node << "1" << "->" << (long int)node;
+            } else {
+                oss_edge << (long int)up_node << "->" << (long int)node;
+            }
             edge_color_map[oss_edge.str()] = nowait_edge;
             edge_back_flag_map[oss_edge.str()] = need_back_node;
         }
     }
 
+    // 调整依赖边颜色
     for (auto node: required_nodes) {
         std::ostringstream oss_start_edge;
         oss_start_edge << (long int)node->parent_graph << "->" << (long int)node;
@@ -225,25 +230,27 @@ std::string Graph::dump(bool is_root) {
         for (auto idx: idx_vec) {
             auto down_node = node->parent_graph->get_node(idx);
             std::ostringstream oss_edge;
-            oss_edge << (long int)node << "->" << (long int)down_node;
-            if (edge_color_map.find(oss_edge.str()) != edge_color_map.end()) {
-                edge_color_map[oss_edge.str()] = wait_edge;
+            if (node->require_sub_graph) {
+                // 画图缀个 1
+                oss_edge << (long int)node << "1" << "->" << (long int)down_node;
+            } else {
+                oss_edge << (long int)node << "->" << (long int)down_node;
             }
+            edge_color_map[oss_edge.str()] = wait_edge;
         }
         for (auto& down_node: node->down_streams) {
-            std::ostringstream oss_edge;
-            oss_edge << (long int)node << "->" << (long int)down_node;
-            if (edge_color_map.find(oss_edge.str()) != edge_color_map.end()) {
-                edge_color_map[oss_edge.str()] = wait_edge;
+            if (down_node->parent_graph != node->parent_graph) {
+                continue;
             }
-        }
-
-        for (auto& down_node: node->down_streams) {
             std::ostringstream oss_edge;
-            oss_edge << (long int)node << "->" << (long int)down_node;
-            if (edge_color_map.find(oss_edge.str()) != edge_color_map.end()) {
-                edge_color_map[oss_edge.str()] = wait_edge;
+            if (node->require_sub_graph) {
+                // 画图缀个 1
+                oss_edge << (long int)node << "1" << "->" << (long int)down_node;
+            } else {
+                oss_edge << (long int)node << "->" << (long int)down_node;
             }
+            edge_color_map[oss_edge.str()] = wait_edge1;
+            // edge_color_map[oss_edge.str()] = wait_edge;
         }
     }
 
@@ -256,10 +263,11 @@ std::string Graph::dump(bool is_root) {
         oss << sub_graph.first << "[label=start, shape=diamond];\n";
         for (auto& sub_node: sub_graph.second) {
             long int sub_node_id = (long int)sub_node;
-            if (node_back_flag_map.find(sub_node_id) != node_back_flag_map.end()) {
+            if (sub_node->require_sub_graph) {
                 oss << "\nsubgraph cluster_" << sub_node_id << " {\nstyle=filled;\ncolor=lightgray;\n";
                 oss << sub_node_id << 1 << "[label=" << sub_node->node_debug_name("--end") << "]\n";
                 oss << sub_node_id << "->" << sub_node_id << 1 << wait_edge << ";\n";
+                // oss << sub_node_id << "->" << sub_node_id << 1 << wait_edge2 << ";\n";
                 oss << sub_node_id << "[label=" << sub_node->node_debug_name() << "]\n";
                 oss << "}\n";
             } else {
@@ -270,11 +278,12 @@ std::string Graph::dump(bool is_root) {
 
         if (parent_node) {
             oss << (long int)parent_node << "->" << sub_graph.first << wait_edge << ";\n";
+            // oss << (long int)parent_node << "->" << sub_graph.first << wait_edge3 << ";\n";
         }
     }
     for (auto& edge_color: edge_color_map) {
         if (edge_back_flag_map[edge_color.first]) {
-            oss << edge_color.first << "1" << wait_edge << ";\n";
+            oss << edge_color.first << "1" << back_edge << ";\n";
         } else {
             oss << edge_color.first << edge_color.second + ";\n";
         }
@@ -287,8 +296,6 @@ std::string Graph::dump(bool is_root) {
         oss << "}\n";
     }
     return oss.str();
-
-    #endif
 
     return "";
 }

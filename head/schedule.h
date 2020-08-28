@@ -15,11 +15,17 @@ class ExecutorContext;
 
 class Schedule {
   private:
-    static Graph* root_graph; 
+    static Graph* root_graph;
     static RunningStatus status;
     static moodycamel::BlockingConcurrentQueue<class Node*> task_queue;
     static std::mutex _mutex;
     static std::unordered_map<std::thread::id, ThreadExecutor*> thread_exec_map;
+  private:
+    static std::atomic<int> idle_worker_num_;
+    static std::atomic<int> ready_worker_num_;
+    static void record_task_finish();
+  public:
+    static void idle_worker_add();
   public:
     static void init(size_t worker_num);
     static void destroy();

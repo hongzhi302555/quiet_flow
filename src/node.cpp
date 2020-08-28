@@ -8,9 +8,12 @@
 #include "head/schedule.h"
 
 DEFINE_bool(enable_qf_check_circle, false, "");
+DEFINE_bool(enable_qf_dump_graph, false, "");
 
 namespace quiet_flow{
 const long int Node::fast_down_strams_bak_init = ((long int)0x1 << 63);
+
+std::atomic<int> Node::pending_worker_num_;
 
 class FlagNode: public Node {
   public:
@@ -83,6 +86,12 @@ Node::Node() {
 
     fast_down_strams = 0;
     fast_down_strams_bak = fast_down_strams_bak_init;
+    pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
+}
+
+Node::~Node() {
+    pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+    sub_graph->clear_graph(); delete sub_graph;
 }
 
 bool Node::check_circle(const std::vector<Node*>& check_nodes) {
@@ -145,7 +154,9 @@ void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_
 
             sub_graph->create_edges(back_node, nodes);  // 这里可以提前触发 back_node, 进而破坏  stack
             status = RunningStatus::Yield; 
+            require_sub_graph = true;
             std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
+            Schedule::idle_worker_add();
             thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
         }
         back_node->back_run_context_ptr = nullptr;
@@ -261,19 +272,15 @@ void Node::block_thread_for_group(Graph* sub_graph) {
 }
 
 std::string Node::node_debug_name(std::string postfix) const {
-    #ifdef QUIET_FLOW_DUMP_GRAPH 
+    if (!FLAGS_enable_qf_dump_graph) {
+        return name_for_debug;
+    }
 
     auto class_name = abi::__cxa_demangle(typeid(*this).name(), nullptr, nullptr, nullptr);
     // std::string a(class_name);
     std::string a(std::string("\"") + class_name + "(" + name_for_debug + postfix + ")\"");
     free(class_name);
     return a;
-
-    #else
-
-    return name_for_debug;
-
-    #endif
 }
 
 

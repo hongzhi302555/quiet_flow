@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <unordered_map>
 #include <folly/futures/Future.h>
+#include "cpputil/metrics2/metrics.h"
 #include <cpp3rdlib/concurrentqueue/include/concurrentqueue/blockingconcurrentqueue.h>
 
 #include "head/node.h"
@@ -147,6 +148,7 @@ int run(int thread_cnt) {
 }}
 
 int main() {
+    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
     for (int i=0; i<1000; i++) {
         quiet_flow::test::run(10);
     }

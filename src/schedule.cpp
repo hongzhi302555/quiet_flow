@@ -1,4 +1,7 @@
 #include "iostream"
+#include "pthread.h"
+#include "cpputil/metrics2/metrics.h"
+
 #include "head/executor.h"
 #include "head/node.h"
 #include "head/schedule.h"
@@ -10,6 +13,8 @@ RunningStatus Schedule::status;
 std::unordered_map<std::thread::id, ThreadExecutor*> Schedule::thread_exec_map;
 moodycamel::BlockingConcurrentQueue<class Node*> Schedule::task_queue;
 std::mutex Schedule::_mutex;
+std::atomic<int> Schedule::idle_worker_num_;
+std::atomic<int> Schedule::ready_worker_num_;
 
 void Schedule::init(size_t worker_num) {
     root_graph = new Graph(nullptr); 
@@ -48,6 +53,9 @@ void Schedule::init(size_t worker_num) {
         }
     } while (need_wait); 
 
+    idle_worker_num_.store(worker_num, std::memory_order_relaxed);
+    ready_worker_num_.store(0, std::memory_order_relaxed);
+    Node::pending_worker_num_.store(0, std::memory_order_relaxed);
     status = RunningStatus::Running;
 }
 
@@ -98,6 +106,7 @@ void Schedule::destroy() {
         root_graph = nullptr;
     }
 
+    idle_worker_num_.store(0, std::memory_order_relaxed);
 }
 
 Graph* Schedule::get_root_graph() {
@@ -109,6 +118,7 @@ void Schedule::add_new_task(Node* new_task) {
         QuietFlowAssert(new_task->unsafe_get_status() == RunningStatus::Initing);
     }
 
+    ready_worker_num_.fetch_add(1, std::memory_order_relaxed);
     new_task->set_status(RunningStatus::Ready);
     task_queue.enqueue(new_task);
 }
@@ -143,6 +153,10 @@ void Schedule::do_schedule() {
     while (true) {  // manual loop unrolling
         task_queue.wait_dequeue(task);
         if (task == Node::flag_node) break;
+
+        idle_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+        ready_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+
         task->resume();
         
         std::vector<Node*> notified_nodes;
@@ -151,7 +165,37 @@ void Schedule::do_schedule() {
         for (auto n: notified_nodes) {
             add_new_task(n);
         }
+
+        record_task_finish();
     }
+}
+
+void Schedule::idle_worker_add() {
+    idle_worker_num_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void Schedule::record_task_finish() {
+    static int finish_cnt = 0;
+    if (finish_cnt % 64 == 0) {
+        cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.idle_worker_num", idle_worker_num_-1);
+        cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.pending_worker_num", Node::pending_worker_num_);
+        cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.ready_worker_num", ready_worker_num_);
+    }
+    finish_cnt += 1;
+
+    #ifdef QUIET_FLOW_DEBUG
+    if (finish_cnt % 64 == 0) {
+        std::ostringstream oss;
+        oss << "quiet_flow.status--->";
+        oss << "#idle_worker_num:" << idle_worker_num_;
+        oss << "#pending_worker_num:" <<  Node::pending_worker_num_;
+        oss << "#ready_worker_num:" << ready_worker_num_;
+        oss << "\n";
+        std::cout << oss.str();
+    }
+    #endif
+
+    idle_worker_num_.fetch_add(1, std::memory_order_relaxed);
 }
 
 ThreadExecutor* Schedule::unsafe_get_cur_thread() {
@@ -169,6 +213,9 @@ void Schedule::routine(ThreadExecutor* thread_exec) {
         }
         _mutex.unlock();
     }
+    
+    pthread_setname_np(pthread_self(), "quiet_flow_worker");
+
     thread_exec->thread_context->set_status(RunningStatus::Ready);
     thread_exec->swap_new_context(thread_exec->thread_context, Schedule::jump_in_schedule);
     thread_exec->context_pre_ptr = nullptr;

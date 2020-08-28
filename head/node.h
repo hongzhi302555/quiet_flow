@@ -11,6 +11,7 @@
 #include "util.h"
 
 DECLARE_bool(enable_qf_check_circle);
+DECLARE_bool(enable_qf_dump_graph);
 
 namespace folly{template<class T>class Future;}
 
@@ -40,11 +41,12 @@ class Graph {
 
 class Node {
   public:
+    static std::atomic<int> pending_worker_num_;
     static Node* flag_node;
     std::string name_for_debug;
   public:
     Node();
-    virtual ~Node() {sub_graph->clear_graph(); delete sub_graph;}
+    virtual ~Node();
     void resume();
     virtual void run() = 0;
     void finish(std::vector<Node*>& notified_nodes);
@@ -78,6 +80,7 @@ class Node {
   private:
     size_t node_id;
     Graph* parent_graph;
+    bool require_sub_graph;
     void set_parent_graph(Graph* g, size_t id) {parent_graph=g; node_id=id;} 
     std::vector<const Node*> up_streams;
     void append_upstreams(const Node*);

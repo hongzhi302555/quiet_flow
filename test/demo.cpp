@@ -11,6 +11,7 @@
 #include <thread>
 #include <unordered_map>
 #include <folly/futures/Future.h>
+#include "cpputil/metrics2/metrics.h"
 #include <cpp3rdlib/concurrentqueue/include/concurrentqueue/blockingconcurrentqueue.h>
 
 #include "head/node.h"
@@ -86,13 +87,13 @@ class NodeM: public Node {
           usleep(1);
           std::cout << "lambda end\n"; 
         }, name_for_debug + "-lambda-"), {});
-        sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+        auto node_4 = sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
           sub_graph->create_edges(new NodeDemo("xxxxx-8-", 2), {});
         }, name_for_debug + "-lambda-"), {});
 
         require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 
-        sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get()});
+        sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get(), node_4.get()});
 
         // do somethings
 
@@ -131,6 +132,8 @@ class NodeRunEnd: public Node {
 }}
 
 int main(int argc, char** argv) {
+    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
+
     google::ParseCommandLineFlags(&argc, &argv, true);
     
     quiet_flow::Schedule::init(2);

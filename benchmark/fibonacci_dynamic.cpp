@@ -4,6 +4,7 @@
 #include <iostream>
 #include "head/node.h"
 #include "head/schedule.h"
+#include "cpputil/metrics2/metrics.h"
 #include "fibonacci.h"
 
 
@@ -57,6 +58,7 @@ void run(int tid) {
 }}
 
 int main(int argc, char** argv) {
+    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
     quiet_flow::Schedule::init(FLAGS_executor_num);
