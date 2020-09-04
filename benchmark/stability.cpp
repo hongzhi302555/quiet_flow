@@ -92,7 +92,8 @@ class NodeM: public Node {
         require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
 
         // require_node(future);  
-        require_node(std::move(FutureRPC().query(1)), name_for_debug + "bbb");       // 等待 future 数据回来
+        int r_t;
+        require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
 
         // do somethings
 

@@ -16,6 +16,7 @@ Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){
 }
 
 Graph::~Graph() {
+    clear_graph();
 }
 
 void Graph::clear_graph(){

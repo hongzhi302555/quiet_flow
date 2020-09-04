@@ -48,7 +48,7 @@ class Node {
     Node();
     virtual ~Node();
     void resume();
-    virtual void run() = 0;
+    virtual void run(){};
     void finish(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus unsafe_get_status() {return status;}
@@ -58,7 +58,10 @@ class Node {
     RunningStatus status;
   protected:
     void require_node(const std::vector<Node*>& nodes, const std::string& sub_node_debug_name="");
-    void require_node(folly::Future<int> &&future, const std::string& sub_node_debug_name="");
+
+    template<class T> 
+    void require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name=""); 
+
     void wait_graph(Graph* graph, const std::string& sub_node_debug_name="");
     Graph* get_graph() {return sub_graph;}
 
@@ -87,6 +90,22 @@ class Node {
     std::string node_debug_name(std::string postfix="") const;
 };
 
+class FutureNode: public Node {
+  public:
+    FutureNode(const std::string& debug_name="") {
+        #ifdef QUIET_FLOW_DEBUG
+        name_for_debug = "end_node@" + debug_name;
+        #endif
+    }
+    ~FutureNode() {
+    }
+    void run() {
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << name_for_debug << std::endl;
+        #endif
+    }
+};
+
 class LambdaNode: public Node {
 public:
     template<typename Callable>
@@ -107,5 +126,15 @@ private:
     std::function<void()> lambda_holder;
 };
 
+template<class T> 
+void Node::require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name) {
+  auto end_node = new FutureNode(sub_node_debug_name);
+  std::move(future).onError(
+      [end_node, &error_value](T) mutable {end_node->status = RunningStatus::Fail; return error_value;}
+  ).then(
+      [this, end_node, &f_value](T ret_value) mutable {f_value=ret_value; sub_graph->create_edges(end_node, {});}
+  );
+  require_node(std::vector<Node*>{end_node}, sub_node_debug_name);
+}
 
 }

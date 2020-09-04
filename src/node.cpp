@@ -58,22 +58,6 @@ class BackNode: public Node {
     }
 };
 
-class FutureNode: public Node {
-  public:
-    FutureNode(const std::string& debug_name="") {
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "end_node@" + debug_name;
-        #endif
-    }
-    ~FutureNode() {
-    }
-    void run() {
-        #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
-        #endif
-    }
-};
-
 Node::Node() {
     name_for_debug = "";
     #ifdef QUIET_FLOW_DEBUG
@@ -168,16 +152,6 @@ void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_
             append_upstreams(node);
         }
     }
-}
-
-void Node::require_node(folly::Future<int> &&future, const std::string& sub_node_debug_name) {
-    auto end_node = new FutureNode(sub_node_debug_name);
-    std::move(future).onError(
-        [end_node](int) mutable {end_node->status = RunningStatus::Fail;return 0;}
-    ).then(
-        [this, end_node](int) mutable {sub_graph->create_edges(end_node, {});}
-    );
-    require_node(std::vector<Node*>{end_node}, sub_node_debug_name);
 }
 
 void Node::wait_graph(Graph* graph, const std::string& sub_node_debug_name) {
