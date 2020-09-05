@@ -69,6 +69,34 @@ class FutureRPC {
     }
 };
 
+class NodeDemo2: public PermeateNode {
+  private: 
+    int sleep_time;
+  public:
+    NodeDemo2(std::string n, int s) {
+        new_task.fetch_add(1, std::memory_order_relaxed);
+        name_for_debug = n;
+        sleep_time = s;
+    }
+    void process(std::string post) {
+        std::ostringstream oss;
+        oss << name_for_debug << " before pemeate sleep" << "\n";
+        std::cout << oss.str();
+
+        usleep(sleep_time);
+
+        int r_t;
+        require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
+
+        std::ostringstream oss2;
+        oss2 << name_for_debug << " after pemeate sleep" << "\n";
+        std::cout << oss2.str();
+
+        finish_task.fetch_add(1, std::memory_order_relaxed);
+    }
+};
+
+static NodeDemo2* demo2 = new NodeDemo2("ttt", 1);
 
 class NodeM: public Node {
   public:
@@ -99,6 +127,8 @@ class NodeM: public Node {
 
         require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
 
+        demo2->process(name_for_debug);
+        
         // require_node(future);  
         int r_t;
         require_node(std::move(FutureRPC().query(10)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来

@@ -43,12 +43,13 @@ class Node {
   public:
     static std::atomic<int> pending_worker_num_;
     static Node* flag_node;
+    static Node* make_future(const std::string& debug_name="");
     std::string name_for_debug;
   public:
     Node();
     virtual ~Node();
     void resume();
-    virtual void run(){};
+    virtual void run() = 0;
     void finish(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus unsafe_get_status() {return status;}
@@ -56,6 +57,7 @@ class Node {
   protected:
     std::mutex _mutex;
     RunningStatus status;
+    bool throwaway_sub_graph;
   protected:
     void require_node(const std::vector<Node*>& nodes, const std::string& sub_node_debug_name="");
 
@@ -90,20 +92,13 @@ class Node {
     std::string node_debug_name(std::string postfix="") const;
 };
 
-class FutureNode: public Node {
-  public:
-    FutureNode(const std::string& debug_name="") {
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "end_node@" + debug_name;
-        #endif
+class PermeateNode: public Node {
+public:
+    PermeateNode() {
+      throwaway_sub_graph = true;
     }
-    ~FutureNode() {
-    }
-    void run() {
-        #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
-        #endif
-    }
+    ~PermeateNode() = default;
+    virtual void run() final {};
 };
 
 class LambdaNode: public Node {
@@ -128,11 +123,16 @@ private:
 
 template<class T> 
 void Node::require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name) {
-  auto end_node = new FutureNode(sub_node_debug_name);
+  auto end_node = make_future(sub_node_debug_name);
+  Graph* sub_graph_ = sub_graph;
+  Graph g(nullptr);
+  if (throwaway_sub_graph) {
+    sub_graph_ = &g;
+  }
   std::move(future).onError(
       [end_node, &error_value](T) mutable {end_node->status = RunningStatus::Fail; return error_value;}
   ).then(
-      [this, end_node, &f_value](T ret_value) mutable {f_value=ret_value; sub_graph->create_edges(end_node, {});}
+      [sub_graph_, end_node, &f_value](T ret_value) mutable {f_value=ret_value; sub_graph_->create_edges(end_node, {});}
   );
   require_node(std::vector<Node*>{end_node}, sub_node_debug_name);
 }
