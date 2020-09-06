@@ -159,8 +159,8 @@ class NodeRunEnd: public Node {
 
 
 int run(int thread_cnt) {
-    Schedule::init(thread_cnt);
-    for (int i=0; i<10000; i++) {
+    Schedule::init(thread_cnt, 100);
+    for (int i=0; i<1000; i++) {
         Schedule::get_root_graph()->create_edges(new NodeM(std::to_string(i)), {});
     }
     

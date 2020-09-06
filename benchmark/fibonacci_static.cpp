@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
-    quiet_flow::Schedule::init(FLAGS_executor_num);
+    quiet_flow::Schedule::init(FLAGS_executor_num, 10);
 
     cpputil::TimeCost tc;
     std::vector<std::thread> threads;

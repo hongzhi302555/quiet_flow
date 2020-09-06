@@ -16,7 +16,9 @@ std::mutex Schedule::_mutex;
 std::atomic<int> Schedule::idle_worker_num_;
 std::atomic<int> Schedule::ready_worker_num_;
 
-void Schedule::init(size_t worker_num) {
+void Schedule::init(size_t worker_num, size_t backup_coroutines) {
+    ExecutorContext::init_context_pool(backup_coroutines);
+
     root_graph = new Graph(nullptr); 
     thread_exec_map.clear();
 
@@ -100,6 +102,8 @@ void Schedule::destroy() {
     }
     thread_exec_map.clear();
 
+    ExecutorContext::destroy_context_pool();
+
     if (root_graph) {
         root_graph->clear_graph();
         delete root_graph;
@@ -157,16 +161,24 @@ void Schedule::do_schedule() {
         idle_worker_num_.fetch_sub(1, std::memory_order_relaxed);
         ready_worker_num_.fetch_sub(1, std::memory_order_relaxed);
 
-        task->resume();
-        
-        std::vector<Node*> notified_nodes;
-        task->finish(notified_nodes);
-        task->set_status(RunningStatus::Recoverable);
-        for (auto n: notified_nodes) {
-            add_new_task(n);
+        while(task) {
+            task->resume();
+            
+            std::vector<Node*> notified_nodes;
+            task->finish(notified_nodes);
+            task->set_status(RunningStatus::Recoverable);
+            task = nullptr;
+            if (notified_nodes.size() > 0) {
+                task = notified_nodes[0];
+                for (size_t i=1; i< notified_nodes.size(); i++) {
+                    add_new_task(notified_nodes[i]);
+                }
+                task->set_status(RunningStatus::Ready);
+            }
+            record_task_finish();
         }
 
-        record_task_finish();
+        idle_worker_num_.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -180,6 +192,8 @@ void Schedule::record_task_finish() {
         cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.idle_worker_num", idle_worker_num_-1);
         cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.pending_worker_num", Node::pending_worker_num_);
         cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.ready_worker_num", ready_worker_num_);
+        cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.pending_context_num", ExecutorContext::pending_context_num_);
+        cpputil::metrics2::Metrics::emit_timer("quiet_flow.status.extra_context_num", ExecutorContext::extra_context_num_);
     }
     finish_cnt += 1;
 
@@ -190,12 +204,12 @@ void Schedule::record_task_finish() {
         oss << "#idle_worker_num:" << idle_worker_num_;
         oss << "#pending_worker_num:" <<  Node::pending_worker_num_;
         oss << "#ready_worker_num:" << ready_worker_num_;
+        oss << "#pending_context_num:" << ExecutorContext::pending_context_num_;
+        oss << "#extra_context_num:" << ExecutorContext::extra_context_num_;
         oss << "\n";
         std::cout << oss.str();
     }
     #endif
-
-    idle_worker_num_.fetch_add(1, std::memory_order_relaxed);
 }
 
 ThreadExecutor* Schedule::unsafe_get_cur_thread() {

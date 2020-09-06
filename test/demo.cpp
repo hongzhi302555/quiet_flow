@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
 
     google::ParseCommandLineFlags(&argc, &argv, true);
     
-    quiet_flow::Schedule::init(2);
+    quiet_flow::Schedule::init(2, 1);
 
     quiet_flow::Schedule::get_root_graph()->create_edges(new quiet_flow::test::NodeM("m"), {});
 
