@@ -2,10 +2,12 @@ cc_library(
     name="quiet_flow_lib",
     srcs=[
         "src/*.cpp",
+        "src/async_extension/*.cpp",
     ],
     incs=[
-        "",
+        ".",
     ],
+    export_incs=["."],
     deps=[
         "cpp3rdlib/folly:v2018.08.20.00@//cpp3rdlib/folly:folly",
         "cpputil/metrics2:1.0.0@//cpputil/metrics2:metrics2",

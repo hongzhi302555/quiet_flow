@@ -16,6 +16,7 @@
 
 #include "head/node.h"
 #include "head/schedule.h"
+#include "head/async_extension/folly_future.h"
 
 static pthread_mutex_t count_lock;
 static pthread_cond_t count_nonzero;
@@ -25,7 +26,7 @@ static std::atomic<int> new_task(0);
 namespace quiet_flow{
 namespace test{
 
-class NodeDemo: public Node {
+class NodeDemo: public FollyFutureNode {
   private: 
     int sleep_time;
   public:
@@ -69,7 +70,7 @@ class FutureRPC {
     }
 };
 
-class NodeDemo2: public PermeateNode {
+class NodeDemo2: public FollyFuturPermeateNode {
   private: 
     int sleep_time;
   public:
@@ -98,7 +99,7 @@ class NodeDemo2: public PermeateNode {
 
 static NodeDemo2* demo2 = new NodeDemo2("ttt", 1);
 
-class NodeM: public Node {
+class NodeM: public FollyFutureNode {
   public:
     NodeM(const std::string& name) {
         new_task.fetch_add(1, std::memory_order_relaxed);
@@ -110,14 +111,14 @@ class NodeM: public Node {
         auto node_2 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-2-", 3), {node_1.get()}); // node_2 依赖 node_1
         auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get()});
         sub_graph->create_edges(new NodeDemo("4", 3), {});
-        sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+        sub_graph->create_edges([](Graph* sub_graph){
           std::cout << "lambda start\n";
           usleep(1);
           std::cout << "lambda end\n"; 
-        }, name_for_debug + "-lambda-"), {});
-        auto node_4 = sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+        }, {});
+        auto node_4 = sub_graph->create_edges([](Graph* sub_graph){
           sub_graph->create_edges(new NodeDemo("xxxxx-8-", 2), {});
-        }, name_for_debug + "-lambda-"), {});
+        }, {});
 
         require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 

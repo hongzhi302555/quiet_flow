@@ -1,7 +1,7 @@
-#include <folly/futures/Future.h>
 #include <cxxabi.h>
 #include "iostream"
 #include <gflags/gflags.h>
+#include <unordered_set>
 
 #include "head/executor.h"
 #include "head/node.h"
@@ -64,22 +64,6 @@ class BackNode: public Node {
     }
 };
 
-class FutureNode: public Node {
-  public:
-    FutureNode(const std::string& debug_name="") {
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "end_node@" + debug_name;
-        #endif
-    }
-    ~FutureNode() {
-    }
-    void run() {
-        #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
-        #endif
-    }
-};
-
 Node::Node() {
     name_for_debug = "";
     #ifdef QUIET_FLOW_DEBUG
@@ -99,10 +83,6 @@ Node::Node() {
 Node::~Node() {
     pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
     sub_graph->clear_graph(); delete sub_graph;
-}
-
-Node* Node::make_future(const std::string& debug_name) {
-    return (new FutureNode(debug_name));
 }
 
 bool Node::check_circle(const std::vector<Node*>& check_nodes) {

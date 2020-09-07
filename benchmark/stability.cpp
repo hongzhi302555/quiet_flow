@@ -17,6 +17,7 @@
 
 #include "head/node.h"
 #include "head/schedule.h"
+#include "head/async_extension/folly_future.h"
 
 
 namespace quiet_flow{
@@ -25,7 +26,7 @@ namespace test {
 static std::atomic<int> finish_task(0);
 static std::atomic<int> new_task(0);
 
-class NodeDemo: public Node {
+class NodeDemo: public FollyFutureNode {
   private: 
     int sleep_time;
   public:
@@ -69,7 +70,7 @@ class FutureRPC {
     }
 };
 
-class NodeDemo2: public PermeateNode {
+class NodeDemo2: public FollyFuturPermeateNode {
   private: 
     int sleep_time;
   public:
@@ -98,8 +99,7 @@ class NodeDemo2: public PermeateNode {
 
 static NodeDemo2* demo2 = new NodeDemo2("ttt", 1);
 
-
-class NodeM: public Node {
+class NodeM: public FollyFutureNode {
   public:
     NodeM(const std::string& name) {
         new_task.fetch_add(1, std::memory_order_relaxed);
