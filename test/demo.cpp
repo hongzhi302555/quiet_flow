@@ -16,6 +16,7 @@
 
 #include "head/node.h"
 #include "head/schedule.h"
+#include "head/async_extension/folly_future.h"
 
 static pthread_mutex_t count_lock;
 static pthread_cond_t count_nonzero;
@@ -25,7 +26,7 @@ static std::atomic<int> new_task(0);
 namespace quiet_flow{
 namespace test{
 
-class NodeDemo: public Node {
+class NodeDemo: public FollyFutureNode {
   private: 
     int sleep_time;
   public:
@@ -69,8 +70,36 @@ class FutureRPC {
     }
 };
 
+class NodeDemo2: public FollyFuturPermeateNode {
+  private: 
+    int sleep_time;
+  public:
+    NodeDemo2(std::string n, int s) {
+        new_task.fetch_add(1, std::memory_order_relaxed);
+        name_for_debug = n;
+        sleep_time = s;
+    }
+    void process(std::string post) {
+        std::ostringstream oss;
+        oss << name_for_debug << " before pemeate sleep" << "\n";
+        std::cout << oss.str();
 
-class NodeM: public Node {
+        usleep(sleep_time);
+
+        int r_t;
+        require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
+
+        std::ostringstream oss2;
+        oss2 << name_for_debug << " after pemeate sleep" << "\n";
+        std::cout << oss2.str();
+
+        finish_task.fetch_add(1, std::memory_order_relaxed);
+    }
+};
+
+static NodeDemo2* demo2 = new NodeDemo2("ttt", 1);
+
+class NodeM: public FollyFutureNode {
   public:
     NodeM(const std::string& name) {
         new_task.fetch_add(1, std::memory_order_relaxed);
@@ -82,14 +111,14 @@ class NodeM: public Node {
         auto node_2 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-2-", 3), {node_1.get()}); // node_2 依赖 node_1
         auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get()});
         sub_graph->create_edges(new NodeDemo("4", 3), {});
-        sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+        sub_graph->create_edges([](Graph* sub_graph){
           std::cout << "lambda start\n";
           usleep(1);
           std::cout << "lambda end\n"; 
-        }, name_for_debug + "-lambda-"), {});
-        auto node_4 = sub_graph->create_edges(new LambdaNode([](Graph* sub_graph){
+        }, {});
+        auto node_4 = sub_graph->create_edges([](Graph* sub_graph){
           sub_graph->create_edges(new NodeDemo("xxxxx-8-", 2), {});
-        }, name_for_debug + "-lambda-"), {});
+        }, {});
 
         require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 
@@ -99,8 +128,12 @@ class NodeM: public Node {
 
         require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
 
+        demo2->process(name_for_debug);
+        
         // require_node(future);  
-        require_node(std::move(FutureRPC().query(1)), name_for_debug + "bbb");       // 等待 future 数据回来
+        int r_t;
+        require_node(std::move(FutureRPC().query(10)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
+        std::cout << r_t;
 
         // do somethings
 
@@ -136,7 +169,7 @@ int main(int argc, char** argv) {
 
     google::ParseCommandLineFlags(&argc, &argv, true);
     
-    quiet_flow::Schedule::init(2);
+    quiet_flow::Schedule::init(2, 1);
 
     quiet_flow::Schedule::get_root_graph()->create_edges(new quiet_flow::test::NodeM("m"), {});
 

@@ -16,6 +16,7 @@ Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){
 }
 
 Graph::~Graph() {
+    clear_graph();
 }
 
 void Graph::clear_graph(){
@@ -96,6 +97,29 @@ std::shared_ptr<Node> Graph::create_edges(Node* new_node, const std::vector<Node
     new_node->append_upstreams(Node::flag_node);
 
     return shared_node;
+}
+
+class LambdaNode: public Node {
+public:
+    LambdaNode(std::function<void(Graph*)> &&callable, std::string debug_name="")
+    : lambda_holder([sub_graph=this->get_graph(), callable=std::move(callable)]() {
+        callable(sub_graph);
+    }) {
+      name_for_debug = debug_name;
+    }
+
+protected:
+    virtual void run(){
+      lambda_holder();
+      wait_graph(this->get_graph());
+    }
+
+private:
+    std::function<void()> lambda_holder;
+};
+
+std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes) {
+    return create_edges(new quiet_flow::LambdaNode(std::move(callable)), required_nodes);
 }
 
 void Node::set_status(RunningStatus s) {

@@ -1,7 +1,7 @@
-#include <folly/futures/Future.h>
 #include <cxxabi.h>
 #include "iostream"
 #include <gflags/gflags.h>
+#include <unordered_set>
 
 #include "head/executor.h"
 #include "head/node.h"
@@ -38,6 +38,7 @@ class BackNode: public Node {
     ~BackNode() {
         #ifdef QUIET_FLOW_DEBUG
         name_for_debug = "free_@" + name_for_debug;
+        std::cout << name_for_debug << std::endl;
         #endif
     }
     void run() {
@@ -53,24 +54,13 @@ class BackNode: public Node {
 
         back_run_context_ptr->set_status(RunningStatus::Running);
 
-        auto thread_exec = Schedule::unsafe_get_cur_thread();
-        thread_exec->s_setcontext(back_run_context_ptr);
-    }
-};
-
-class FutureNode: public Node {
-  public:
-    FutureNode(const std::string& debug_name="") {
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "end_node@" + debug_name;
-        #endif
-    }
-    ~FutureNode() {
-    }
-    void run() {
         #ifdef QUIET_FLOW_DEBUG
         std::cout << name_for_debug << std::endl;
         #endif
+
+
+        auto thread_exec = Schedule::unsafe_get_cur_thread();
+        thread_exec->s_setcontext(back_run_context_ptr);
     }
 };
 
@@ -79,6 +69,7 @@ Node::Node() {
     #ifdef QUIET_FLOW_DEBUG
     name_for_debug = "node";
     #endif
+    throwaway_sub_graph = false;
     sub_graph = new Graph(this);
     status = RunningStatus::Initing;
     wait_count = 0;
@@ -149,10 +140,14 @@ void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_
         back_node->back_run_context_ptr = thread_exec->context_ptr;
         getcontext(&back_node->back_run_context_ptr->context);
 
+        Graph* sub_graph_ = sub_graph;
+        if (throwaway_sub_graph) {
+            sub_graph_ = new Graph(nullptr);
+        }
         if (back_node->self_status == RunningStatus::Initing) {
             back_node->self_status = RunningStatus::Ready;
 
-            sub_graph->create_edges(back_node, nodes);  // 这里可以提前触发 back_node, 进而破坏  stack
+            sub_graph_->create_edges(back_node, nodes);
             status = RunningStatus::Yield; 
             require_sub_graph = true;
             std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
@@ -160,6 +155,10 @@ void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_
             thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
         }
         back_node->back_run_context_ptr = nullptr;
+        if (throwaway_sub_graph) {
+            delete sub_graph_;
+        }
+
         thread_exec = Schedule::unsafe_get_cur_thread();
         thread_exec->context_pre_ptr = nullptr;
         status = RunningStatus::Running; 
@@ -168,16 +167,6 @@ void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_
             append_upstreams(node);
         }
     }
-}
-
-void Node::require_node(folly::Future<int> &&future, const std::string& sub_node_debug_name) {
-    auto end_node = new FutureNode(sub_node_debug_name);
-    std::move(future).onError(
-        [end_node](int) mutable {end_node->status = RunningStatus::Fail;return 0;}
-    ).then(
-        [this, end_node](int) mutable {sub_graph->create_edges(end_node, {});}
-    );
-    require_node(std::vector<Node*>{end_node}, sub_node_debug_name);
 }
 
 void Node::wait_graph(Graph* graph, const std::string& sub_node_debug_name) {

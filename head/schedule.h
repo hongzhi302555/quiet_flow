@@ -27,7 +27,7 @@ class Schedule {
   public:
     static void idle_worker_add();
   public:
-    static void init(size_t worker_num);
+    static void init(size_t worker_num, size_t backup_coroutines);
     static void destroy();
     static Graph* get_root_graph();
     static void add_new_task(Node* new_task);

@@ -3,21 +3,62 @@
 
 namespace quiet_flow{
 const unsigned int ExecutorContext::MAX_STACK_SIZE = 8192 * 1024;
+std::atomic<int> ExecutorContext::pending_context_num_;
+std::atomic<int> ExecutorContext::extra_context_num_;
+moodycamel::BlockingConcurrentQueue<void*> ExecutorContext::stack_pool;
 
 ExecutorContext::ExecutorContext(int stack_size) {
-    stack_ptr = malloc(stack_size);
-    #ifdef QUIET_FLOW_DEBUG
-    std::cout << "malloc\n";
-    #endif
+    if (stack_pool.try_dequeue(stack_ptr)) {
+        from_pool = true;
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "pop pool\n";
+        #endif
+    } else {
+        from_pool = false;
+        stack_ptr = malloc(stack_size);
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "malloc\n";
+        #endif
+        extra_context_num_.fetch_add(1, std::memory_order_relaxed);
+    }
     status = RunningStatus::Initing;
+    pending_context_num_.fetch_add(1, std::memory_order_relaxed);
 }
 
 ExecutorContext::~ExecutorContext() {
-    free(stack_ptr);
-    #ifdef QUIET_FLOW_DEBUG
-    std::cout << "free\n";
-    #endif
+    if (from_pool) {
+        stack_pool.enqueue(stack_ptr);
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "back_pool\n";
+        #endif
+    } else {
+        free(stack_ptr);
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "free\n";
+        #endif
+        extra_context_num_.fetch_sub(1, std::memory_order_relaxed);
+    }
     stack_ptr = nullptr;
+    pending_context_num_.fetch_sub(1, std::memory_order_relaxed);
+}
+
+void ExecutorContext::init_context_pool(size_t pool_size) {
+    for (size_t i=0; i < pool_size; i++) {
+        stack_pool.enqueue(malloc(MAX_STACK_SIZE));
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "malloc\n";
+        #endif
+    }
+}
+
+void ExecutorContext::destroy_context_pool() {
+    void *stack_ptr;
+    while(stack_pool.try_dequeue(stack_ptr)) {
+        free(stack_ptr);
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "free\n";
+        #endif
+    }
 }
 
 RunningStatus ExecutorContext::get_status() {
