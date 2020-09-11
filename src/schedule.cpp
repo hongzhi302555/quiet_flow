@@ -117,6 +117,14 @@ Graph* Schedule::get_root_graph() {
     return root_graph;
 }
 
+void Schedule::add_root_task(RootNode* root_task) {
+    #ifdef QUIET_FLOW_DEBUG
+    root_graph->create_edges(root_task, {});
+    #else
+    add_new_task(root_task);
+    #endif 
+}
+
 void Schedule::add_new_task(Node* new_task) {
     if (new_task != Node::flag_node) {
         QuietFlowAssert(new_task->unsafe_get_status() == RunningStatus::Initing);
@@ -167,7 +175,12 @@ void Schedule::do_schedule() {
             std::vector<Node*> notified_nodes;
             task->finish(notified_nodes);
             task->set_status(RunningStatus::Recoverable);
+
+            if (task->is_ghost()) {
+                delete task;
+            }
             task = nullptr;
+
             if (notified_nodes.size() > 0) {
                 task = notified_nodes[0];
                 for (size_t i=1; i< notified_nodes.size(); i++) {

@@ -54,6 +54,7 @@ class Node {
     void finish(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus unsafe_get_status() {return status;}
+    bool is_ghost() {return false;}
   protected:
     std::mutex _mutex;
     RunningStatus status;
@@ -86,6 +87,21 @@ class Node {
     std::vector<const Node*> up_streams;
     void append_upstreams(const Node*);
     std::string node_debug_name(std::string postfix="") const;
+};
+
+
+class RootNode: public Node {
+public:
+    RootNode() {
+    }
+    virtual ~RootNode() = default;
+    bool is_ghost() {
+      #ifdef QUIET_FLOW_DEBUG
+      return false;
+      #else
+      return true;
+      #endif 
+    }
 };
 
 class PermeateNode: public Node {

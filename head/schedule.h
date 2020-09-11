@@ -10,6 +10,7 @@
 namespace quiet_flow{
 class Graph;
 class Node;
+class RootNode;
 class ThreadExecutor;
 class ExecutorContext;
 
@@ -30,9 +31,11 @@ class Schedule {
     static void init(size_t worker_num, size_t backup_coroutines);
     static void destroy();
     static Graph* get_root_graph();
+    static void add_root_task(RootNode* root_task);
     static void add_new_task(Node* new_task);
     static ThreadExecutor* unsafe_get_cur_thread();
     static void jump_in_schedule();
+
   private:
     static void do_schedule();
     static void routine(ThreadExecutor* thread_exec);
