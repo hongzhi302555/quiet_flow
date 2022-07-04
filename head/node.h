@@ -48,6 +48,7 @@ class Node {
     static std::atomic<int> pending_worker_num_;
     static Node* flag_node;
     std::string name_for_debug;
+    Node* root_node;
 
   /* -------------- 对外暴露的接口 -----------*/
   public:
@@ -64,7 +65,7 @@ class Node {
     void finish(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus loose_get_status() const {return status;}
-    bool is_ghost() {return false;}
+    virtual bool is_ghost() {return false;}
 
   /* -------------- 子类使用的接口 -----------*/
   protected: 
@@ -102,9 +103,10 @@ class Node {
 class RootNode: public Node {
 public:
     RootNode() {
+      root_node = this;
     }
     virtual ~RootNode() = default;
-    bool is_ghost() {
+    virtual bool is_ghost() override {
       #ifdef QUIET_FLOW_DEBUG
       return false;
       #else

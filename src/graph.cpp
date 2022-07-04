@@ -75,6 +75,9 @@ Node* Graph::get_node(size_t idx) {
 std::shared_ptr<Node> Graph::create_edges(Node* new_node, const std::vector<Node*>& required_nodes) {
     std::shared_ptr<Node> shared_node;
     shared_node.reset(new_node);
+    if (parent_node) {
+        new_node->root_node = parent_node->root_node;
+    }
     {
         mutex_.lock();
         new_node->set_parent_graph(this, node_num);
