@@ -12,9 +12,9 @@
 #include <pthread.h>
 #include <unordered_map>
 #include <folly/futures/Future.h>
-#include "cpputil/metrics2/metrics.h"
-#include <cpp3rdlib/concurrentqueue/include/concurrentqueue/blockingconcurrentqueue.h>
+#include "head/cpp3rd/metrics.h"
 
+#include "head/cpp3rd/concurrentqueue.h"
 #include "head/node.h"
 #include "head/schedule.h"
 #include "head/async_extension/folly_future.h"
@@ -26,7 +26,7 @@ namespace test {
 static std::atomic<int> finish_task(0);
 static std::atomic<int> new_task(0);
 
-class NodeDemo: public FollyFutureNode {
+class NodeDemo: public Node {
   private: 
     int sleep_time;
   public:
@@ -70,9 +70,10 @@ class FutureRPC {
     }
 };
 
-class NodeDemo2: public FollyFuturPermeateNode {
+class NodeDemo2: public FollyFutureAspect {
   private: 
     int sleep_time;
+    std::string name_for_debug;
   public:
     NodeDemo2(std::string n, int s) {
         new_task.fetch_add(1, std::memory_order_relaxed);
@@ -87,7 +88,7 @@ class NodeDemo2: public FollyFuturPermeateNode {
         usleep(sleep_time);
 
         int r_t;
-        require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
+        FollyFutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
 
         std::ostringstream oss2;
         oss2 << name_for_debug << " after pemeate sleep" << "\n";
@@ -99,7 +100,7 @@ class NodeDemo2: public FollyFuturPermeateNode {
 
 static NodeDemo2* demo2 = new NodeDemo2("ttt", 1);
 
-class NodeM: public FollyFutureNode {
+class NodeM: public Node {
   public:
     NodeM(const std::string& name) {
         new_task.fetch_add(1, std::memory_order_relaxed);
@@ -112,19 +113,19 @@ class NodeM: public FollyFutureNode {
         auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get()});
         sub_graph->create_edges(new NodeDemo("4", 3), {});
 
-        require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
+        ScheduleAspect::require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 
         sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get()});
 
         // do somethings
 
-        require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
+        ScheduleAspect::require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
 
         demo2->process(name_for_debug);
 
         // require_node(future);  
         int r_t;
-        require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
+        FollyFutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
 
         // do somethings
 
@@ -132,7 +133,7 @@ class NodeM: public FollyFutureNode {
 
         // do somethings
 
-        wait_graph(sub_graph, name_for_debug + "ccc");  // 等待子任务全部执行完，主要是防止野指针等
+        ScheduleAspect::wait_graph(sub_graph, name_for_debug + "ccc");  // 等待子任务全部执行完，主要是防止野指针等
         std::cout << "clear\n";
         sub_graph->clear_graph();
         std::cout << "end\n";
@@ -141,34 +142,15 @@ class NodeM: public FollyFutureNode {
     }
 };
 
-static pthread_mutex_t count_lock;
-static pthread_cond_t count_nonzero;
-
-class NodeRunEnd: public Node {
-  public:
-    NodeRunEnd() {
-    }
-    void run() {
-        wait_graph(Schedule::get_root_graph(), name_for_debug + "RunEnd");  // 等待子任务全部执行完，主要是防止野指针等
-        pthread_mutex_lock(&count_lock);
-        pthread_cond_signal(&count_nonzero);
-        pthread_mutex_unlock(&count_lock);
-    }
-};
-
-
-
 int run(int thread_cnt) {
-    Schedule::init(thread_cnt, 100);
-    for (int i=0; i<1000; i++) {
-        Schedule::get_root_graph()->create_edges(new NodeM(std::to_string(i)), {});
-    }
-    
-    (new Graph(nullptr))->create_edges(new NodeRunEnd(), {});
+    Schedule::init(thread_cnt);
 
-    pthread_mutex_lock(&count_lock);
-    pthread_cond_wait(&count_nonzero, &count_lock);
-    pthread_mutex_unlock(&count_lock);
+    Graph* g = new Graph(nullptr);
+    for (int i=0; i<1000; i++) {
+        g->create_edges(new NodeM(std::to_string(i)), {});
+    }
+    Node::block_thread_for_group(g);
+    delete g;
     
     std::cout << "wait" << std::endl;
     Schedule::destroy();
@@ -180,7 +162,7 @@ int run(int thread_cnt) {
 }}
 
 int main() {
-    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
+    quiet_flow::Metrics::init("test.yhz", "test.yhz");
     for (int i=0; i<1000; i++) {
         quiet_flow::test::run(10);
     }

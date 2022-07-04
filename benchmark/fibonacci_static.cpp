@@ -4,7 +4,7 @@
 #include <iostream>
 #include <vector>
 #include "head/node.h"
-#include "cpputil/metrics2/metrics.h"
+#include "head/cpp3rd/metrics.h"
 #include "head/schedule.h"
 #include "fibonacci.h"
 
@@ -47,10 +47,10 @@ void run(int tid) {
 }}
 
 int main(int argc, char** argv) {
-    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
+    quiet_flow::Metrics::init("test.yhz", "test.yhz");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
-    quiet_flow::Schedule::init(FLAGS_executor_num, 10);
+    quiet_flow::Schedule::init(FLAGS_executor_num);
 
     cpputil::TimeCost tc;
     std::vector<std::thread> threads;
@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     }
 
     quiet_flow::Schedule::destroy();
-    VLOG(1) << "----all cost: " << tc.get_elapsed();
+    VLOG(1) << "----all cost: " << tc.get_elapsed() << "--fib_total_num:" << quiet_flow::test::fib_total_num;
 
     return 0;
 }

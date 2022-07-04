@@ -5,6 +5,7 @@
 
 #include "head/executor.h"
 #include "head/node.h"
+#include "head/aspect.h"
 #include "head/schedule.h"
 
 DEFINE_bool(enable_qf_check_circle, false, "");
@@ -13,64 +14,33 @@ DEFINE_bool(enable_qf_dump_graph, false, "");
 namespace quiet_flow{
 const long int Node::fast_down_strams_bak_init = ((long int)0x1 << 63);
 
+#ifdef QUIET_FLOW_DEBUG
+static std::mutex debug_mutex;
+static std::vector<Node*> debug_node_list;
+#endif
 std::atomic<int> Node::pending_worker_num_;
 
 class FlagNode: public Node {
   public:
-    FlagNode() = default;
+    FlagNode() {pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);};
     ~FlagNode() = default;
     void run() {}
 };
 
 Node* Node::flag_node = new FlagNode();
 
-class BackNode: public Node {
-  public:
-    RunningStatus self_status;
-    std::shared_ptr<ExecutorContext> back_run_context_ptr;
-  public:
-    BackNode(const std::string& debug_name="") {
-        self_status = RunningStatus::Initing;
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "back_node@" + debug_name;
-        #endif
-    }
-    ~BackNode() {
-        #ifdef QUIET_FLOW_DEBUG
-        name_for_debug = "free_@" + name_for_debug;
-        std::cout << name_for_debug << std::endl;
-        #endif
-    }
-    void run() {
-        {
-            _mutex.lock();
-            status = RunningStatus::Recoverable;
-            _mutex.unlock();
-        }
-
-        while (back_run_context_ptr->get_status() != RunningStatus::Yield) {
-            usleep(1);
-        }
-
-        back_run_context_ptr->set_status(RunningStatus::Running);
-
-        #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
-        #endif
-
-
-        auto thread_exec = Schedule::unsafe_get_cur_thread();
-        thread_exec->s_setcontext(back_run_context_ptr);
-    }
-};
-
 Node::Node() {
     name_for_debug = "";
     #ifdef QUIET_FLOW_DEBUG
     name_for_debug = "node";
+    {
+        debug_mutex.lock();
+        debug_node_list.push_back(this);
+        debug_mutex.unlock();
+    }
     #endif
-    throwaway_sub_graph = false;
-    sub_graph = new Graph(this);
+    // sub_graph = new Graph(this);
+    sub_graph = nullptr;
     status = RunningStatus::Initing;
     wait_count = 0;
     parent_graph = nullptr;
@@ -82,106 +52,38 @@ Node::Node() {
 
 Node::~Node() {
     pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
-    sub_graph->clear_graph(); delete sub_graph;
-}
-
-bool Node::check_circle(const std::vector<Node*>& check_nodes) {
-    if (!FLAGS_enable_qf_check_circle) {
-        return false;
+    if (sub_graph && Schedule::safe_get_cur_exec()) {
+        // 必须确保是 schcedule 任务
+        ScheduleAspect::wait_graph(sub_graph);
     }
-
-    std::unordered_set<const Node*> a_s, b_s;
-    std::unordered_set<const Node*>* a_ptr = &a_s;
-    std::unordered_set<const Node*>* b_ptr = &b_s;
-    for (auto n: check_nodes) {
-        if (n->status < RunningStatus::Finish) {
-            a_ptr->emplace(n);
-        }
-    }
-
-    while(a_ptr->size() > 0) {
-        if (a_ptr->find(this) != a_ptr->end()) {
-            return true;
-        }
-        std::unordered_set<const Node*>* t_ptr = b_ptr;
-        b_ptr = a_ptr;
-        a_ptr = t_ptr;
-        a_ptr->clear();
-        for (auto cur_n: *b_ptr) {
-            for (auto n: cur_n->up_streams) {
-                if (n == Node::flag_node) {
-                    continue;
-                }
-                if (n->status < RunningStatus::Finish) {
-                    a_ptr->emplace(n);
-                }
-            }
-        }
-    }
-
-    return false;
-}
-
-void Node::require_node(const std::vector<Node*>& nodes, const std::string& sub_node_debug_name) {
-    bool need_wait = false;
-    for (auto& node: nodes) {
-        if (node->status < RunningStatus::Finish) {
-            need_wait = true;
-        }
-    }
-    if (need_wait) {
-        QuietFlowAssert(!check_circle(nodes));
-
-        auto back_node = new BackNode(sub_node_debug_name);
-        append_upstreams(back_node);
-        back_node->add_downstream(this);
-
-        auto thread_exec = Schedule::unsafe_get_cur_thread();
-        back_node->back_run_context_ptr = thread_exec->context_ptr;
-        getcontext(&back_node->back_run_context_ptr->context);
-
-        Graph* sub_graph_ = sub_graph;
-        if (throwaway_sub_graph) {
-            sub_graph_ = new Graph(nullptr);
-        }
-        if (back_node->self_status == RunningStatus::Initing) {
-            back_node->self_status = RunningStatus::Ready;
-
-            sub_graph_->create_edges(back_node, nodes);
-            status = RunningStatus::Yield; 
-            require_sub_graph = true;
-            std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
-            Schedule::idle_worker_add();
-            thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
-        }
-        back_node->back_run_context_ptr = nullptr;
-        if (throwaway_sub_graph) {
-            delete sub_graph_;
-        }
-
-        thread_exec = Schedule::unsafe_get_cur_thread();
-        thread_exec->context_pre_ptr = nullptr;
-        status = RunningStatus::Running; 
-    } else {
-        for (auto& node: nodes) {
-            append_upstreams(node);
-        }
+    if (sub_graph) {
+        sub_graph->clear_graph();
+        delete sub_graph;
     }
 }
 
-void Node::wait_graph(Graph* graph, const std::string& sub_node_debug_name) {
-    std::vector<Node*> required_nodes;
-    graph->get_nodes(required_nodes);
-    require_node(required_nodes, sub_node_debug_name);
+Graph* Node::get_graph() {
+    if (sub_graph) {
+        return sub_graph;
+    }
+   
+    {
+        mutex_.lock();
+        if (!sub_graph) {
+            sub_graph = new Graph(this);
+        }
+        mutex_.unlock();
+    }
+    return sub_graph;
 }
 
 void Node::resume() {
     QuietFlowAssert(status == RunningStatus::Ready);
 
     {
-        _mutex.lock();
+        mutex_.lock();
         status = RunningStatus::Running;
-        _mutex.unlock();
+        mutex_.unlock();
     }
     run();
     #ifdef QUIET_FLOW_DEBUG
@@ -200,7 +102,7 @@ int Node::add_wait_count(int upstream_count) {
 void Node::finish(std::vector<Node*>& notified_nodes) {
     status = RunningStatus::Finish;
 
-    _mutex.lock();
+    mutex_.lock();
     notified_nodes.reserve(down_streams.size());
     /*          T1                              T2 (add_downstream)
      * reg = fast_down_strams               
@@ -209,7 +111,7 @@ void Node::finish(std::vector<Node*>& notified_nodes) {
      * fast_down_strams_bak = reg
      */
     fast_down_strams_bak = fast_down_strams;
-    _mutex.unlock();
+    mutex_.unlock();
 
     std::vector<size_t> idx_vec;
     bit_map_idx(fast_down_strams_bak, Graph::fast_node_max_num, idx_vec);
@@ -220,13 +122,13 @@ void Node::finish(std::vector<Node*>& notified_nodes) {
         }
     }
 
-    _mutex.lock();
+    mutex_.lock();
     for (auto d: down_streams) {
         if (1 == d->sub_wait_count()) {
             notified_nodes.push_back(d);
         }
     }
-    _mutex.unlock();
+    mutex_.unlock();
 }
 
 class NodeRunWaiter: public Node {

@@ -2,7 +2,7 @@ cc_library(
     name="quiet_flow_lib",
     srcs=[
         "src/*.cpp",
-        "src/async_extension/*.cpp",
+        "src/*/*.cpp",
     ],
     incs=[
         ".",
@@ -168,4 +168,31 @@ cc_binary(
         "-fsanitize=address",
     ],
     bundle_path="/home/yanghongzhi/work/quiet_flow_dev",
+)
+
+cc_test(
+    name="_unit_test",
+    srcs=[
+        "unit_test/*_test.cpp",
+        "unit_test/*/*_test.cpp",
+    ],
+    incs=["."],
+    extra_cppflags = [
+        "-std=c++14",
+        "-O2",
+        "-g",
+        "-fopenmp",
+        "-D UNIT_TEST",
+        "-Wall", "-Wextra", "-Werror",
+        "-Wno-unused-local-typedefs",
+        "-Wno-unused-function",
+        "-Wno-unused-parameter",
+        "-Wunused-variable",
+    ],
+    deps=[
+        ":quiet_flow_lib",
+        "cpp3rdlib/gtest:1.6.0@//cpp3rdlib/gtest:gtest",
+    ],
+    optimize=["-O3"],
+    bundle_path="ab_util/lib",
 )

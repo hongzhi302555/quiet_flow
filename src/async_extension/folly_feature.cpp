@@ -6,14 +6,16 @@
 
 namespace quiet_flow{
 
-class FutureInnerNode: public Node {
+FollyFutureAspect::Assistant* FollyFutureAspect::aspect_ = new FollyFutureAspect::Assistant();
+
+class InnerEndNode: public Node {
   public:
-    FutureInnerNode(const std::string& debug_name="") {
+    InnerEndNode(const std::string& debug_name="") {
         #ifdef QUIET_FLOW_DEBUG
         name_for_debug = "end_node@" + debug_name;
         #endif
     }
-    ~FutureInnerNode() {
+    ~InnerEndNode() {
     }
     void run() {
         #ifdef QUIET_FLOW_DEBUG
@@ -22,7 +24,7 @@ class FutureInnerNode: public Node {
     }
 };
 
-Node* FollyFutureNode::make_future(const std::string& debug_name) {
-    return (new FutureInnerNode(debug_name));
+Node* FollyFutureAspect::Assistant::make_future(const std::string& debug_name) {
+    return (new InnerEndNode(debug_name));
 }
 }

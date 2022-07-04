@@ -1,5 +1,5 @@
 #include "iostream"
-#include "head/executor.h"
+#include "head/thread.h"
 
 namespace quiet_flow{
 

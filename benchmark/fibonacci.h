@@ -1,4 +1,7 @@
 #pragma once
+
+#include <atomic>
+
 DEFINE_bool(verbose, false, "");
 DEFINE_int32(executor_num, 10, "number of executor threads");
 DEFINE_int32(tnum, 1, "thread number");
@@ -6,6 +9,8 @@ DEFINE_int32(loop, 1, "loop times");
 
 namespace quiet_flow{
 namespace test{
+
+static std::atomic<int> fib_total_num(0);
 
 #define PRINT(x)                     \
     if (FLAGS_verbose) {             \
@@ -46,7 +51,7 @@ class NodeFib: public Node {
     }
     void run() {
         // std::cout << name_for_debug << "\n";
-        fib(cnt);
+        fib_total_num.fetch_add(fib(cnt), std::memory_order_relaxed);
         // std::cout << name_for_debug << " end\n";
     }
 };

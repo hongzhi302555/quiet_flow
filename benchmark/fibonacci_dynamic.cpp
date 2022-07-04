@@ -4,12 +4,10 @@
 #include <iostream>
 #include "head/node.h"
 #include "head/schedule.h"
-#include "cpputil/metrics2/metrics.h"
+#include "head/cpp3rd/metrics.h"
 #include "fibonacci.h"
 
-
-static pthread_mutex_t count_lock;
-static pthread_cond_t count_nonzero;
+static quiet_flow::Graph* g = new quiet_flow::Graph(nullptr);
 
 namespace quiet_flow{
 namespace test{
@@ -33,35 +31,24 @@ class NodeRun: public Node {
         auto L = sub_graph->create_edges(new NodeFib(12), {I.get(),J.get()}); // 插入任务
         sub_graph->create_edges(new NodeFib(13), {F.get(),K.get(),L.get()}); // 插入任务
 
-        wait_graph(sub_graph);  // 等待子任务全部执行完，主要是防止野指针等
+        ScheduleAspect::wait_graph(sub_graph);  // 等待子任务全部执行完，主要是防止野指针等
         sub_graph->clear_graph();
     }
 };
 
-class NodeRunEnd: public Node {
-  public:
-    NodeRunEnd() {
-    }
-    void run() {
-        wait_graph(Schedule::get_root_graph(), name_for_debug + "RunEnd");  // 等待子任务全部执行完，主要是防止野指针等
-        pthread_mutex_lock(&count_lock);
-        pthread_cond_signal(&count_nonzero);
-        pthread_mutex_unlock(&count_lock);
-    }
-};
 
 void run(int tid) {
     for (int i = 0; i < FLAGS_loop; i++) {
-        Schedule::get_root_graph()->create_edges(new NodeRun(i), {});
+        g->create_edges(new NodeRun(i), {});
     }
 }
 }}
 
 int main(int argc, char** argv) {
-    cpputil::metrics2::Metrics::init("test.yhz", "test.yhz");
+    quiet_flow::Metrics::init("test.yhz", "test.yhz");
     google::ParseCommandLineFlags(&argc, &argv, true);
 
-    quiet_flow::Schedule::init(FLAGS_executor_num, 10);
+    quiet_flow::Schedule::init(FLAGS_executor_num);
 
     cpputil::TimeCost tc;
     std::vector<std::thread> threads;
@@ -75,14 +62,11 @@ int main(int argc, char** argv) {
     }
     VLOG(1) << "----all send: " << tc.get_elapsed();
 
-    auto *end_graph = new quiet_flow::Graph(nullptr);
-    end_graph->create_edges(new quiet_flow::test::NodeRunEnd(), {});
-    pthread_mutex_lock(&count_lock);
-    pthread_cond_wait(&count_nonzero, &count_lock);
-    pthread_mutex_unlock(&count_lock);
+    quiet_flow::Node::block_thread_for_group(g);
     VLOG(1) << "----all cost: " << tc.get_elapsed();
 
-    std::cout << quiet_flow::Schedule::get_root_graph()->dump(true);
+    std::cout << g->dump(true);
+    delete g;
     quiet_flow::Schedule::destroy();
 
     return 0;

@@ -5,6 +5,10 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef UNIT_TEST
+  #define private public
+  #define protected public
+#endif
 
 namespace quiet_flow{
 
@@ -39,7 +43,7 @@ class LogMessageFatal {
     LogMessageFatal(__FILE__, __LINE__).stream()                  \
       << "QuietFlow failed: " #x << ": ";}
 
-void bit_map_idx(long int bit_map, size_t bit_size, std::vector<size_t>& idx_vec);
+void bit_map_idx(const long int bit_map, size_t bit_size, std::vector<size_t>& idx_vec);
 void bit_map_set(long int& bit_map, size_t bit, size_t bit_size);
 bool bit_map_get(const long int bit_map, size_t bit, size_t bit_size);
 
