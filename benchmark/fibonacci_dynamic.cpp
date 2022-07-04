@@ -60,10 +60,11 @@ int main(int argc, char** argv) {
     for (auto& t : threads) {
         t.join();
     }
-    VLOG(1) << "----all send: " << tc.get_elapsed();
+    std::cout  << "----all send: " << tc.get_elapsed();
 
     quiet_flow::Node::block_thread_for_group(g);
-    VLOG(1) << "----all cost: " << tc.get_elapsed();
+    std::cout << "----all cost: " << tc.get_elapsed() << "--fib_total_num:" << quiet_flow::test::fib_total_num;
+    std::cout << std::endl;
 
     std::cout << g->dump(true);
     delete g;

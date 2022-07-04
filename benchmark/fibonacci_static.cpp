@@ -63,7 +63,8 @@ int main(int argc, char** argv) {
     }
 
     quiet_flow::Schedule::destroy();
-    VLOG(1) << "----all cost: " << tc.get_elapsed() << "--fib_total_num:" << quiet_flow::test::fib_total_num;
+    std::cout << "----all cost: " << tc.get_elapsed() << "--fib_total_num:" << quiet_flow::test::fib_total_num;
+    std::cout << std::endl;
 
     return 0;
 }
