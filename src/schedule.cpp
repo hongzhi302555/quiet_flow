@@ -183,30 +183,8 @@ void Schedule::add_new_task(Node* new_task) {
     }
 
     ready_worker_num_.fetch_add(1, std::memory_order_relaxed);
-    new_task->set_status(RunningStatus::Ready);
-
-    int32_t free_exec_idx = -1;
-    while(true) {
-        free_exec_idx = ExectorItem::get_free_exec(Schedule::thread_exec_bit_map);
-        if (free_exec_idx < 0) {
-            inner_schedule->task_queue_length.fetch_add(1, std::memory_order_relaxed);
-            inner_schedule->task_queue.enqueue(new_task);
-            free_exec_idx = ExectorItem::get_free_exec(Schedule::thread_exec_bit_map);
-            if (free_exec_idx >= 0) {
-                auto free_exec = Schedule::thread_exec_vec[free_exec_idx];
-                free_exec->signal();
-            }
-            break;
-        }
-        auto free_exec = Schedule::thread_exec_vec[free_exec_idx];
-        ExectorItem::atomic_set_bit_map(free_exec_idx, Schedule::thread_exec_bit_map);  // 不要再分配任务了
-        if (free_exec->cas_ready_task(NullNode, new_task)) {
-            // 这里有个 windows，但只会导致 new_task 延迟消费，不会出错
-            free_exec->signal();
-            break;
-        }
-        free_exec->signal();
-    }
+    inner_schedule->task_queue_length.fetch_add(1, std::memory_order_relaxed);
+    inner_schedule->task_queue.enqueue(new_task);
 }
 
 void Schedule::change_context_status() {
@@ -268,34 +246,15 @@ void Schedule::run_task(Node* task) {
 
 void Schedule::do_schedule() {
     Node *task = nullptr;
-    while (true) { 
+    while (true) {  // manual loop unrolling
+        task_queue.wait_dequeue(task);
+        if (task == Node::flag_node) break;
+        task_queue_length.fetch_sub(1, std::memory_order_relaxed);
+
         idle_worker_num_.fetch_sub(1, std::memory_order_relaxed);
 
-        for (size_t consumer_try=0; consumer_try<3; consumer_try++) { 
-            task = Schedule::get_cur_exec()->get_ready_task();
-            if (Schedule::get_cur_exec()->cas_ready_task(task, TempNode)) {
-                if (task < TempNode2) {
-                    continue;
-                }
-                if (task == Node::flag_node) return;
-                run_task(task);
-            }
-        }
-
-        while (task_queue_length>0 && task_queue.try_dequeue(task)) {
-            if (!task) {
-                break;
-            }
-            task_queue_length.fetch_sub(1, std::memory_order_relaxed);
-            if (task == Node::flag_node) return;
-            run_task(task);
-        }
+        run_task(task);
         idle_worker_num_.fetch_add(1, std::memory_order_relaxed);
-
-        Schedule::get_cur_exec()->atomic_clear_bit_map(Schedule::thread_exec_bit_map); // 可以分配任务了
-        if (Schedule::get_cur_exec()->cas_ready_task(TempNode, NullNode)){
-            Schedule::get_cur_exec()->wait();
-        }
     }
 }
 
