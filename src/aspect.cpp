@@ -22,9 +22,7 @@ class BackNode: public Node {
   public:
     BackNode(const std::string& debug_name="") {
         self_status = RunningStatus::Initing;
-        #ifdef QUIET_FLOW_DEBUG
         name_for_debug = "back_node@" + debug_name;
-        #endif
     }
     ~BackNode() {
         #ifdef QUIET_FLOW_DEBUG

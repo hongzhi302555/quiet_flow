@@ -30,7 +30,6 @@ class FlagNode: public Node {
 Node* Node::flag_node = new FlagNode();
 
 Node::Node() {
-    name_for_debug = "";
     #ifdef QUIET_FLOW_DEBUG
     name_for_debug = "node";
     {
@@ -50,8 +49,7 @@ Node::Node() {
     pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
 }
 
-Node::~Node() {
-    pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+void Node::release() {
     if (sub_graph && Schedule::safe_get_cur_exec()) {
         // 必须确保是 schcedule 任务
         ScheduleAspect::wait_graph(sub_graph);
@@ -59,7 +57,13 @@ Node::~Node() {
     if (sub_graph) {
         sub_graph->clear_graph();
         delete sub_graph;
+        sub_graph = nullptr;
     }
+}
+
+Node::~Node() {
+    pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+    release();
 }
 
 Graph* Node::get_graph() {
@@ -160,6 +164,7 @@ void Node::block_thread_for_group(Graph* sub_graph) {
 
     g->clear_graph();
     delete g;
+    g = nullptr;
 }
 
 std::string Node::node_debug_name(std::string postfix) const {

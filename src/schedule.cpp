@@ -169,7 +169,7 @@ void Schedule::destroy() {
 
 void Schedule::add_root_task(RootNode* root_task) {
     #ifdef QUIET_FLOW_DEBUG
-    root_graph->create_edges(root_task, {});
+    inner_schedule->root_graph->create_edges(root_task, {});
     #else
     add_new_task(root_task);
     #endif 
@@ -251,6 +251,7 @@ void Schedule::run_task(Node* task) {
         task->set_status(RunningStatus::Recoverable);
 
         if (task->is_ghost()) {
+            task->release();
             delete task;
         }
         task = nullptr;

@@ -54,6 +54,7 @@ class Node {
   public:
     Node();
     virtual ~Node();
+    virtual void release() final;
     static void block_thread_for_group(Graph* sub_graph); // 会阻塞当前线程, 慎用
  
   /* -------------- engine 执行需要的接口 -----------*/ 
@@ -65,7 +66,7 @@ class Node {
     void finish(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus loose_get_status() const {return status;}
-    virtual bool is_ghost() {return false;}
+    virtual bool is_ghost() {return false;}   // ghost 节点，qf 执行完自动回收
 
   /* -------------- 子类使用的接口 -----------*/
   protected: 
@@ -104,6 +105,9 @@ class RootNode: public Node {
 public:
     RootNode() {
       root_node = this;
+      #ifdef QUIET_FLOW_DEBUG
+      name_for_debug = "root_node";
+      #endif
     }
     virtual ~RootNode() = default;
     virtual bool is_ghost() override {

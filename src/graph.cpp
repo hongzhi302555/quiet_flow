@@ -121,7 +121,9 @@ public:
     : lambda_holder([sub_graph=this->get_graph(), callable=std::move(callable)]() {
         callable(sub_graph);
     }) {
+      #ifdef QUIET_FLOW_DEBUG
       name_for_debug = debug_name;
+      #endif
     }
 
 protected:
