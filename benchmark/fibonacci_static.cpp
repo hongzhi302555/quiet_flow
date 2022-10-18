@@ -2,6 +2,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
+#include <thread>
 #include <vector>
 #include "head/node.h"
 #include "head/cpp3rd/metrics.h"

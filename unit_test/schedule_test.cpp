@@ -48,7 +48,7 @@ TEST_F(TestSchedule, test_add_new_task_no_exec) {
   t->status = RunningStatus::Initing;
   s->add_new_task(t);
   EXPECT_EQ(t->status, RunningStatus::Ready);
-  EXPECT_EQ(s->task_queue.size_approx(), 1);
+  EXPECT_EQ(s->task_queue->size_approx(), 1);
 }
 
 TEST_F(TestSchedule, test_add_new_task_free_exec) {
@@ -64,14 +64,14 @@ TEST_F(TestSchedule, test_add_new_task_free_exec) {
   EXPECT_EQ(Schedule::thread_exec_bit_map.size(), 2);
   EXPECT_EQ(Schedule::thread_exec_vec[0]->ready_task_, t);
   EXPECT_EQ(Schedule::thread_exec_bit_map, std::vector<uint8_t>({0b10000000, 0b00000000}));
-  EXPECT_EQ(s->task_queue.size_approx(), 0);
+  EXPECT_EQ(s->task_queue->size_approx(), 0);
 
   Node* t2 = new Node1();
   Schedule::thread_exec_bit_map[0] = 0b01110000;
   s->add_new_task(t2);
   EXPECT_EQ(Schedule::thread_exec_vec[0]->ready_task_, t);
   EXPECT_EQ(Schedule::thread_exec_vec[4]->ready_task_, t2);
-  EXPECT_EQ(s->task_queue.size_approx(), 0);
+  EXPECT_EQ(s->task_queue->size_approx(), 0);
   EXPECT_EQ(Schedule::thread_exec_bit_map, std::vector<uint8_t>({0b11111000, 0b00000000}));
 
   Node* t3 = new Node1();
@@ -81,7 +81,7 @@ TEST_F(TestSchedule, test_add_new_task_free_exec) {
   EXPECT_EQ(Schedule::thread_exec_vec[0]->ready_task_, t);
   EXPECT_EQ(Schedule::thread_exec_vec[4]->ready_task_, t2);
   EXPECT_EQ(Schedule::thread_exec_vec[12]->ready_task_, t3);
-  EXPECT_EQ(s->task_queue.size_approx(), 0);
+  EXPECT_EQ(s->task_queue->size_approx(), 0);
   EXPECT_EQ(Schedule::thread_exec_bit_map, std::vector<uint8_t>({0b11111111, 0b11111101}));
 
   Node* t4 = new Node1();
@@ -91,7 +91,7 @@ TEST_F(TestSchedule, test_add_new_task_free_exec) {
   EXPECT_EQ(Schedule::thread_exec_vec[0]->ready_task_, t);
   EXPECT_EQ(Schedule::thread_exec_vec[4]->ready_task_, t2);
   EXPECT_EQ(Schedule::thread_exec_vec[12]->ready_task_, t3);
-  EXPECT_EQ(s->task_queue.size_approx(), 1);
+  EXPECT_EQ(s->task_queue->size_approx(), 1);
   EXPECT_EQ(Schedule::thread_exec_bit_map, std::vector<uint8_t>({0b11111111, 0b11111111}));
 }
 

@@ -14,7 +14,6 @@
 #include <folly/futures/Future.h>
 #include "head/cpp3rd/metrics.h"
 
-#include "head/cpp3rd/concurrentqueue.h"
 #include "head/node.h"
 #include "head/schedule.h"
 #include "head/async_extension/folly_future.h"

@@ -6,8 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "head/cpp3rd/concurrentqueue.h"
-
 namespace quiet_flow{
 
 class Signal {

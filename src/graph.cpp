@@ -13,7 +13,7 @@ namespace quiet_flow{
 
 Node::append_upstreams_func Node::append_upstreams = nullptr;
 
-const size_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
+const uint64_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
 Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){}
 
@@ -28,6 +28,11 @@ void Graph::clear_graph(){
 
     std::vector<Node*> required_nodes;
     get_nodes(required_nodes);
+
+    if (Schedule::safe_get_cur_exec()) {
+        // 必须确保是 schcedule 任务
+        ScheduleAspect::require_node(required_nodes);
+    }
 
     for (auto i: required_nodes) {
         int cnt = 0;
@@ -61,7 +66,7 @@ void Graph::get_nodes(std::vector<Node*>& required_nodes) {
     mutex_.unlock();
 }
 
-Node* Graph::get_node(size_t idx) {
+Node* Graph::get_node(uint64_t idx) {
     if (idx < fast_node_max_num) {
         return fast_nodes[idx].get();
     } else {
@@ -273,7 +278,7 @@ std::string Graph::dump(bool is_root) {
         oss_start_edge << (long int)node->parent_graph << "->" << (long int)node;
         edge_color_map[oss_start_edge.str()] = virtual_edge;
 
-        std::vector<size_t> idx_vec;
+        std::vector<uint64_t> idx_vec;
         bit_map_idx(node->fast_down_strams_bak, Graph::fast_node_max_num, idx_vec);
         for (auto idx: idx_vec) {
             auto down_node = node->parent_graph->get_node(idx);

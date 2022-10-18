@@ -4,9 +4,10 @@
 #include <mutex>
 #include <ucontext.h>
 #include <unordered_map>
-
-#include "head/cpp3rd/concurrentqueue.h"
-#include "util.h"
+#include "head/locks/thread.h"
+#include "head/queue/task.h"
+// #include "head/cpp3rd/concurrentqueue.h"
+#include "head/util.h"
 
 DECLARE_int32(backup_coroutines);  // "number of coroutine pool"
 
@@ -22,7 +23,7 @@ class ExectorItem {
     static __thread int32_t thread_idx_;
   private:
     Thread* exec;
-    LightweightSemaphore sema;
+    locks::LightweightSemaphore sema;
     Node* current_task_;
     std::atomic<Node*> ready_task_;
   public:
@@ -33,46 +34,8 @@ class ExectorItem {
     inline void set_current_task(Node* current_task) {current_task_=current_task;}
     inline Node* get_current_task() {return current_task_;}
 
-    inline Node* get_ready_task(){return ready_task_;};
-    inline bool cas_ready_task(Node* expected, Node* desired) {
-      return ready_task_.compare_exchange_strong(expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-    };
     inline void signal(){sema.signal();}
     inline void wait(){sema.wait();}
-
-    static int32_t get_free_exec(std::vector<uint8_t>& bit_map) {
-      static std::vector<char> bit_table = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
-        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 
-        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 
-        4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 7, -1,
-      };
-      for (size_t i=0; i< bit_map.size(); i++) {
-        char a = bit_table[bit_map[i]];
-        if (a >= 0) {
-          return  (i << 3) + a;
-        }
-      }
-      return -1;
-    }
-    static void atomic_set_bit_map(int32_t thread_idx, std::vector<uint8_t>& bit_map) {
-      bit_map[thread_idx>>3] |=  (0x80>>(thread_idx&7));
-    }
-    static void atomic_clear_bit_map(std::vector<uint8_t>& bit_map) {
-      bit_map[thread_idx_>>3] &=  ~(0x80>>(thread_idx_&7));
-    }
 };
 
 class Schedule {
@@ -87,11 +50,11 @@ class Schedule {
     static void record_task_finish();
     static void routine(Thread* thread_exec);
     static void change_context_status();
-    static void init_work_thread(size_t worker_num, void (*)(Thread*));
+    static void init_work_thread(uint64_t worker_num, void (*)(Thread*));
 
   // 向外部交暴露调度信息
   public:
-    static void init(size_t worker_num);
+    static void init(uint64_t worker_num);
     static void destroy();
     static void idle_worker_add();
     inline static ExectorItem* get_cur_exec() {return thread_exec_vec[ExectorItem::thread_idx_];}
@@ -115,8 +78,8 @@ class Schedule {
   private:
     Graph* root_graph;
     RunningStatus status;
-    std::atomic<size_t> task_queue_length;
-    ConcurrentQueue<class Node*> task_queue;
+    // std::atomic<uint64_t> task_queue_length;
+    queue::task::TaskQueue* task_queue;
 };
 
 }

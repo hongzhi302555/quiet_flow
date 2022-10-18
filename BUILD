@@ -17,7 +17,9 @@ cc_library(
     name="quiet_flow_lib",
     srcs=[
         "src/*.cpp",
-        "src/*/*.cpp",
+        "src/queue/*.cpp",
+        "src/async_extension/*.cpp",
+        "src/locks/thread.cpp",
     ],
     incs=[
         "./",
@@ -117,7 +119,7 @@ cc_binary(
         "-Wno-unused-local-typedefs", "-Wno-unused-function",
         "-Wno-unused-parameter", "-Wno-unused-variable",
         "-Wno-comment", "-ftemplate-depth=9000",
-        "-D QUIET_FLOW_DEBUG",
+        # "-D QUIET_FLOW_DEBUG",
         "-fopenmp"
     ],
     bundle_path="lib",
@@ -151,7 +153,7 @@ cc_test(
     name="_unit_test",
     srcs=[
         "unit_test/*_test.cpp",
-        "unit_test/*/*_test.cpp",
+        "unit_test/queue/*_test.cpp",
     ],
     incs=["."],
     extra_cppflags = [
@@ -161,6 +163,7 @@ cc_test(
         "-Wno-unused-parameter", "-Wno-unused-variable",
         "-Wno-comment", "-ftemplate-depth=9000",
         "-D UNIT_TEST",
+        # "-D QUIET_FLOW_DEBUG",
         "-fopenmp"
     ],
     deps=[
@@ -170,4 +173,3 @@ cc_test(
     ],
     bundle_path="lib",
 )
-    

@@ -28,7 +28,7 @@ class NodeWait: public Node {
     std::vector<std::string>& res_;
     std::atomic<int>& res_idx_;
   public:
-    NodeWait(Signal& s, size_t id, std::vector<std::string>& res, std::atomic<int>& res_idx): s_(s), res_(res), res_idx_(res_idx) {
+    NodeWait(Signal& s, uint64_t id, std::vector<std::string>& res, std::atomic<int>& res_idx): s_(s), res_(res), res_idx_(res_idx) {
       name_for_debug = "w@" + std::to_string(id);
     }
     void run() {
@@ -43,7 +43,7 @@ class NodeNotify: public Node {
     std::vector<std::string>& res_;
     std::atomic<int>& res_idx_;
   public:
-    NodeNotify(Signal& s, size_t id, std::vector<std::string>& res, std::atomic<int>& res_idx): s_(s), res_(res), res_idx_(res_idx) {
+    NodeNotify(Signal& s, uint64_t id, std::vector<std::string>& res, std::atomic<int>& res_idx): s_(s), res_(res), res_idx_(res_idx) {
       name_for_debug = "n@" + std::to_string(id);
     }
     void run() {
@@ -60,10 +60,10 @@ static std::vector<Node*> init_nodes(Signal& s, std::vector<std::string>& res) {
   res.resize(60);
 
   std::vector<Node*> nodes;
-  for (size_t i=0; i<30; i++) {
+  for (uint64_t i=0; i<30; i++) {
     nodes.push_back(new NodeWait(s, i, res, res_idx));
   }
-  for (size_t i=0; i<30; i++) {
+  for (uint64_t i=0; i<30; i++) {
     nodes.push_back(new NodeNotify(s, i, res, res_idx));
   }
 
@@ -89,7 +89,7 @@ TEST_F(TestChannleInit, test_channel_LT) {
 
   Node::block_thread_for_group(&g);
 
-  size_t cnt = 0;
+  uint64_t cnt = 0;
   for (auto r_: res) {
     if (r_[0] == 'n') {
       cnt ++;

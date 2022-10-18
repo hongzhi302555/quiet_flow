@@ -59,6 +59,7 @@ void Node::release() {
         delete sub_graph;
         sub_graph = nullptr;
     }
+    set_status(RunningStatus::Destroy);
 }
 
 Node::~Node() {
@@ -117,7 +118,7 @@ void Node::finish(std::vector<Node*>& notified_nodes) {
     fast_down_strams_bak = fast_down_strams;
     mutex_.unlock();
 
-    std::vector<size_t> idx_vec;
+    std::vector<uint64_t> idx_vec;
     bit_map_idx(fast_down_strams_bak, Graph::fast_node_max_num, idx_vec);
     for (auto idx: idx_vec) {
         auto d = parent_graph->get_node(idx);

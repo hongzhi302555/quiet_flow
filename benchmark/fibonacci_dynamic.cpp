@@ -1,13 +1,14 @@
 #include <cpputil/common/timer/time_cost.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <thread>
 #include <iostream>
 #include "head/node.h"
 #include "head/schedule.h"
 #include "head/cpp3rd/metrics.h"
 #include "fibonacci.h"
 
-static quiet_flow::Graph* g = new quiet_flow::Graph(nullptr);
+static std::vector<quiet_flow::Graph*> g;
 
 namespace quiet_flow{
 namespace test{
@@ -39,7 +40,8 @@ class NodeRun: public Node {
 
 void run(int tid) {
     for (int i = 0; i < FLAGS_loop; i++) {
-        g->create_edges(new NodeRun(i), {});
+        // 并发太高时，一个图上亿数据，撑不下，也不符合设计初衷
+        g[i]->create_edges(new NodeRun(i), {});
     }
 }
 }}
@@ -47,6 +49,11 @@ void run(int tid) {
 int main(int argc, char** argv) {
     quiet_flow::Metrics::init("test.yhz", "test.yhz");
     google::ParseCommandLineFlags(&argc, &argv, true);
+
+    g.resize(FLAGS_loop);
+    for (int i = 0; i < FLAGS_loop; i++) {
+        g[i] = new quiet_flow::Graph(nullptr);
+    }
 
     quiet_flow::Schedule::init(FLAGS_executor_num);
 
@@ -62,12 +69,15 @@ int main(int argc, char** argv) {
     }
     std::cout  << "----all send: " << tc.get_elapsed();
 
-    quiet_flow::Node::block_thread_for_group(g);
+    for (int i = 0; i < FLAGS_loop; i++) {
+        quiet_flow::Node::block_thread_for_group(g[i]);
+    }
     std::cout << "----all cost: " << tc.get_elapsed() << "--fib_total_num:" << quiet_flow::test::fib_total_num;
     std::cout << std::endl;
 
-    std::cout << g->dump(true);
-    delete g;
+    for (int i = 0; i < FLAGS_loop; i++) {
+        delete g[i];
+    }
     quiet_flow::Schedule::destroy();
 
     return 0;

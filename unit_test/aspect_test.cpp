@@ -33,9 +33,9 @@ void mock_run_thread(Node* task) {
   item->set_current_task(task);
 }
 
-std::vector<Node*> init_nodes(size_t n) {
+std::vector<Node*> init_nodes(uint64_t n) {
   std::vector<Node*> _nodes;
-  for (size_t i=0; i<n; i++) {
+  for (uint64_t i=0; i<n; i++) {
     auto* t_ = new Node1();
     _nodes.push_back(t_);
   }

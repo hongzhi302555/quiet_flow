@@ -10,7 +10,7 @@ DEFINE_int32(loop, 1, "loop times");
 namespace quiet_flow{
 namespace test{
 
-static std::atomic<int> fib_total_num(0);
+static std::atomic<long long> fib_total_num(0);
 
 #define PRINT(x)                     \
     if (FLAGS_verbose) {             \

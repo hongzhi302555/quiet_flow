@@ -12,6 +12,10 @@
 
 namespace quiet_flow{
 
+using uint64_t = unsigned long long;
+using int64_t = signed long long;
+using int32_t = signed long;
+
 enum class RunningStatus{
     Initing,
     Ready,
@@ -19,6 +23,7 @@ enum class RunningStatus{
     Yield,
     Finish,
     Fail,
+    Destroy,
     Recoverable,
 };
 
@@ -43,8 +48,8 @@ class LogMessageFatal {
     LogMessageFatal(__FILE__, __LINE__).stream()                  \
       << "QuietFlow failed: " #x << ": ";}
 
-void bit_map_idx(const long int bit_map, size_t bit_size, std::vector<size_t>& idx_vec);
-void bit_map_set(long int& bit_map, size_t bit, size_t bit_size);
-bool bit_map_get(const long int bit_map, size_t bit, size_t bit_size);
+void bit_map_idx(const long int bit_map, uint64_t bit_size, std::vector<uint64_t>& idx_vec);
+void bit_map_set(long int& bit_map, uint64_t bit, uint64_t bit_size);
+bool bit_map_get(const long int bit_map, uint64_t bit, uint64_t bit_size);
 
 }

@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "util.h"
-#include "aspect.h"
+#include "head/util.h"
+#include "head/aspect.h"
 
 DECLARE_bool(enable_qf_check_circle);
 DECLARE_bool(enable_qf_dump_graph);
@@ -26,18 +26,18 @@ class Graph {
     ~Graph();
     void clear_graph();
     void get_nodes(std::vector<Node*>& required_nodes);
-    Node* get_node(size_t idx);
+    Node* get_node(uint64_t idx);
     std::shared_ptr<Node> create_edges(Node* new_node, const std::vector<Node*>& required_nodes);
     std::shared_ptr<Node> create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes);
     std::string dump(bool is_root);
   public:
-    static const size_t fast_node_max_num;
+    static const uint64_t fast_node_max_num;
   private:
-    size_t idx;
+    uint64_t idx;
     std::mutex mutex_;
     Node* parent_node;
 
-    size_t node_num;
+    uint64_t node_num;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Node>> fast_nodes;
 };
@@ -79,7 +79,7 @@ class Node {
   friend class Graph;
   friend class ScheduleAspect::ScheduleAspect;
   private:
-    size_t node_id;
+    uint64_t node_id;
     Graph* parent_graph;
     Graph* sub_graph;
     bool require_sub_graph;
@@ -96,7 +96,7 @@ class Node {
     int add_wait_count(int upstream_count);
     int add_downstream(Node* node);
     int sub_wait_count();
-    void set_parent_graph(Graph* g, size_t id) {parent_graph=g; node_id=id;} 
+    void set_parent_graph(Graph* g, uint64_t id) {parent_graph=g; node_id=id;} 
     std::string node_debug_name(std::string postfix="") const;    // dump_graph 使用
 };
 
