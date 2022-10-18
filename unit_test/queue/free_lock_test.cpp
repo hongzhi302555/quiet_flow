@@ -26,7 +26,6 @@ class LimitQueueTest: public LimitQueue {
       vec.reserve(capacity);
       #else
       vec = (void**)(calloc(capacity, sizeof(void*)));
-      flag_vec = (uint64_t*)(calloc(capacity, sizeof(uint64_t)));
       #endif
       capacity_bitmap = capacity - 1;
     }

@@ -13,13 +13,12 @@ class LimitQueue: public AbstractQueue {
   private:
     #ifdef QUIET_FLOW_DEBUG
     std::vector<void*> vec;
-    std::vector<uint64_t> flag_vec;
     #else
     void** vec;
-    uint64_t* flag_vec;
     #endif
     uint64_t capacity = 0;
     uint64_t capacity_bitmap = 0;
+    std::atomic<uint64_t>* flag_vec;
 
 		std::atomic<uint64_t> head;
 		std::atomic<uint64_t> head_missed;
@@ -43,11 +42,10 @@ class LimitQueue: public AbstractQueue {
     virtual ~LimitQueue(){
       #ifdef QUIET_FLOW_DEBUG
       vec.resize(0);
-      flag_vec.resize(0);
       #else
       free(vec);
-      free(flag_vec);
       #endif
+      free(flag_vec);
     };
   public:
     virtual uint64_t size() override;

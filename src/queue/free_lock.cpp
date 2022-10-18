@@ -15,11 +15,13 @@ LimitQueue::LimitQueue(uint64_t size) {
   capacity = align_queue_size(size);
   #ifdef QUIET_FLOW_DEBUG
   vec.resize(capacity);
-  flag_vec.resize(capacity);
   #else
   vec = (void**)(calloc(capacity, sizeof(void*)));
-  flag_vec = (uint64_t*)(calloc(capacity, sizeof(uint64_t)));
   #endif
+  flag_vec = (std::atomic<uint64_t>*)(malloc(capacity * sizeof(std::atomic<uint64_t>)));
+  for (auto i=0; i<capacity; i++) {
+    flag_vec[i] = 0;
+  }
   capacity_bitmap = capacity - 1;
 
   head = 0;
@@ -61,14 +63,14 @@ bool LimitQueue::try_dequeue(void** item) {
        */
       uint64_t head_ = head.fetch_add(1, std::memory_order_acq_rel);
       auto idx = head_ & capacity_bitmap;
-      while (flag_vec[idx] != head_);
+      while (flag_vec[idx].load(std::memory_order_acquire) != head_);
       /**
        * flag_READ_tail
        * tail.fetch_add 之后未必就能读了，参考 flag_WRITE_tail
        */
       (*item) = vec[idx];
-      std::atomic_thread_fence(std::memory_order_acquire);
       vec[idx] = nullptr;
+      flag_vec[idx].store(0, std::memory_order_release);
       return true;
     } else {
       head_missed.fetch_add(1, std::memory_order_release);
@@ -88,7 +90,7 @@ bool  LimitQueue::try_enqueue(void* item) {
     if (!is_full(head_, tail_ahead_-tail_missed_)) {
       uint64_t tail_ = tail.fetch_add(1, std::memory_order_acq_rel);
       auto idx = tail_ & capacity_bitmap;
-      while (vec[idx] != nullptr);
+      while (flag_vec[idx].load(std::memory_order_acquire) != 0);
       /**
        * flag_WRITE_head
        * head.fetch_add 之后未必就能写了，参考 flag_READ_head
@@ -98,8 +100,7 @@ bool  LimitQueue::try_enqueue(void* item) {
        * flag_WRITE_tail
        * head.fetch_add 之后未必就能写了，参考 flag_READ_tail
        */
-      std::atomic_thread_fence(std::memory_order_acquire);
-      flag_vec[idx] = tail_;
+      flag_vec[idx].store(tail_, std::memory_order_release);
       return true;
     } else {
       tail_missed.fetch_add(1, std::memory_order_release);

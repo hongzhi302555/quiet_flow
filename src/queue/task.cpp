@@ -1,6 +1,7 @@
 #include <atomic>
 #include "head/cpp3rd/metrics.h"
 #include "head/queue/lock.h"
+#include "head/queue/free_lock.h"
 #include "head/queue/task.h"
 
 namespace quiet_flow{
@@ -9,7 +10,8 @@ namespace queue{
 namespace task{
 
 TaskQueue::TaskQueue(uint64_t size) {
-  limit_queue = new queue::lock::LimitQueue(size);
+  // limit_queue = new queue::lock::LimitQueue(size);
+  limit_queue = new queue::free_lock::LimitQueue(size);
   unlimit_queue = new queue::lock::UnLimitQueue(size);
 }
 

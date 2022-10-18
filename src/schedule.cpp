@@ -25,7 +25,7 @@ Schedule::Schedule() {
     status = RunningStatus::Initing;
     root_graph = new Graph(nullptr);
     // task_queue_length = 0;
-    task_queue = new queue::task::TaskQueue(1024);
+    task_queue = new queue::task::TaskQueue(4096);
 }
 
 Schedule::~Schedule() {
