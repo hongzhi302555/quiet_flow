@@ -5,8 +5,13 @@
 #include <ucontext.h>
 #include <unordered_map>
 #include "head/locks/thread.h"
+
+#ifdef LOCAL_QUEUE
 #include "head/queue/task.h"
-// #include "head/cpp3rd/concurrentqueue.h"
+#else
+#include "head/cpp3rd/concurrentqueue.h"
+#endif
+
 #include "head/util.h"
 
 DECLARE_int32(backup_coroutines);  // "number of coroutine pool"
@@ -79,7 +84,11 @@ class Schedule {
     Graph* root_graph;
     RunningStatus status;
     // std::atomic<uint64_t> task_queue_length;
+    #ifdef LOCAL_QUEUE
     queue::task::TaskQueue* task_queue;
+    #else
+    ConcurrentQueue<Node*>* task_queue;
+    #endif
 };
 
 }

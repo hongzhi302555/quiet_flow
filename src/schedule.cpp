@@ -25,7 +25,11 @@ Schedule::Schedule() {
     status = RunningStatus::Initing;
     root_graph = new Graph(nullptr);
     // task_queue_length = 0;
+    #ifdef LOCAL_QUEUE
     task_queue = new queue::task::TaskQueue(4096);
+    #else
+    task_queue = new ConcurrentQueue<Node*>();
+    #endif
 }
 
 Schedule::~Schedule() {
@@ -244,7 +248,11 @@ void Schedule::run_task(Node* task) {
 void Schedule::do_schedule() {
     Node *task = nullptr;
     while (true) {  // manual loop unrolling
+        #ifdef LOCAL_QUEUE
         task_queue->wait_dequeue((void**)(&task));
+        #else
+        task_queue->wait_dequeue(task);
+        #endif
         if (task == Node::flag_node) break;
         // task_queue_length.fetch_sub(1, std::memory_order_relaxed);
 
