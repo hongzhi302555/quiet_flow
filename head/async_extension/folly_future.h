@@ -61,10 +61,10 @@ void FollyFutureAspect::Assistant::require_node(folly::Future<T> &&future, T& f_
   }
   auto end_node = make_future(sub_node_debug_name);
   Graph g(nullptr);
-  std::move(future).onError(
-      [end_node, &error_value](T) mutable {return error_value;}
-  ).then(
+  std::move(future).then(
       [sub_graph_=&g, end_node, &f_value](T ret_value) mutable {f_value=ret_value; sub_graph_->create_edges(end_node, {});}
+  ).onError(
+      [sub_graph_=&g, end_node, &f_value, &error_value](T) mutable {f_value=error_value;sub_graph_->create_edges(end_node, {});}
   );
   require_node(std::vector<Node*>{end_node}, sub_node_debug_name);
 }

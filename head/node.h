@@ -28,7 +28,7 @@ class Graph {
     void get_nodes(std::vector<Node*>& required_nodes);
     Node* get_node(uint64_t idx);
     std::shared_ptr<Node> create_edges(Node* new_node, const std::vector<Node*>& required_nodes);
-    std::shared_ptr<Node> create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes);
+    std::shared_ptr<Node> create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name = "");
     std::string dump(bool is_root);
   public:
     static const uint64_t fast_node_max_num;

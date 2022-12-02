@@ -141,8 +141,8 @@ private:
     std::function<void()> lambda_holder;
 };
 
-std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes) {
-    return create_edges(new quiet_flow::LambdaNode(std::move(callable)), required_nodes);
+std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name) {
+    return create_edges(new quiet_flow::LambdaNode(std::move(callable), debug_name), required_nodes);
 }
 
 void Node::set_status(RunningStatus s) {
