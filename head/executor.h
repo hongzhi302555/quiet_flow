@@ -16,6 +16,7 @@ class ExecutorContext {
   private:
     ucontext_t context;
     void* stack_ptr;
+    int stack_size;
     RunningStatus status;
     void* current_task_;
   public:
@@ -25,6 +26,9 @@ class ExecutorContext {
     void set_status(RunningStatus);
     ucontext_t* get_coroutine_context() {return &context;}
     void* get_stack_base() {return stack_ptr;}
+    void shrink_physical_memory();
+  private:
+    void shrink_empty_stack();
 };
 
 class Thread {

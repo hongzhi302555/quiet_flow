@@ -66,6 +66,29 @@ cc_binary(
 )
 
 cc_binary(
+    name="stack_over",
+    srcs=[
+        "test/stack_over.cpp",
+    ],
+    incs=[
+        "",
+    ],
+    deps=[
+        "#pthread",
+    ],
+    custom_deps=custom_deps,
+    extra_cppflags = [
+        "-O0", "-g",
+        "-Wall", "-Wextra", "-Werror",
+        "-Wno-unused-local-typedefs", "-Wno-unused-function",
+        "-Wno-unused-parameter", "-Wno-unused-variable",
+        "-Wno-comment", "-ftemplate-depth=9000",
+        "-fopenmp"
+    ],
+    bundle_path="lib",
+)
+
+cc_binary(
     name="fibonacci_dynamic",
     srcs=[
         "benchmark/fibonacci_dynamic.cpp",
