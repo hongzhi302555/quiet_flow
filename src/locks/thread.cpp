@@ -69,7 +69,7 @@ bool LightweightSemaphore::do_wait(std::int64_t timeout_usecs) {
   // Is there a better way to set the initial spin count?
   // If we lower it to 1000, testBenaphore becomes 15x slower on my Core i7-5930K Windows PC,
   // as threads start hitting the kernel semaphore.
-  int spin = 10000;
+  int spin = 100;
   while (--spin >= 0) {
     old_count = m_count.load(std::memory_order_relaxed);
     if ((old_count > 0) && m_count.compare_exchange_strong(old_count, old_count - 1, std::memory_order_acquire, std::memory_order_relaxed))
