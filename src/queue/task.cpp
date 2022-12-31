@@ -4,29 +4,64 @@
 #include "head/queue/free_lock.h"
 #include "head/queue/task.h"
 
+#include <iostream>
+
 namespace quiet_flow{
 namespace queue{
 
 namespace task{
 
-TaskQueue::TaskQueue(uint64_t size) {
+TaskQueue::TaskQueue(uint64_t size):m_count(0) {
   // limit_queue = new queue::lock::LimitQueue(size);
   limit_queue = new queue::free_lock::LimitQueue(size);
   unlimit_queue = new queue::lock::UnLimitQueue(size);
 }
 
+void TaskQueue::signal() {
+  int32_t old_count = m_count.fetch_add(1, std::memory_order_release);
+
+  bool to_release = old_count > 0 ? false: true;
+  if (to_release) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cond_.notify_one();
+  }
+}
+
+bool TaskQueue::try_wait() {
+  return false;
+}
+
+void TaskQueue::wait() {
+    int old_count = m_count.fetch_sub(1, std::memory_order_release);
+    if (old_count > 0) {
+      return;
+    }
+    std::unique_lock<std::mutex> lock(mutex_);
+    old_count = m_count.load(std::memory_order_relaxed);
+    if (old_count > 0) {
+      return;
+    }
+    cond_.wait(lock);
+}
+
 bool TaskQueue::enqueue(void* item) {
   if (inner_enqueue(item)) {
-    sema.signal();
+    signal();
     return true;
   }
   return false;
 }
 
 void TaskQueue::wait_dequeue(void** item) {
-  sema.wait();
+  if (inner_dequeue(item)) {
+      m_count.fetch_sub(1, std::memory_order_release);
+      return;
+  }
+
+  wait(); // 虚假唤醒
   while (!inner_dequeue(item)) {
-    continue;
+    m_count.fetch_add(1, std::memory_order_release);
+    wait();
   }
 }
 

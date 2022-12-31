@@ -1,6 +1,6 @@
 #pragma once
 
-#include "head/locks/thread.h"
+#include <condition_variable>
 #include "head/queue/interface.h"
 
 namespace quiet_flow{
@@ -11,7 +11,14 @@ class TaskQueue {
   private:
     AbstractQueue* limit_queue;
     AbstractQueue* unlimit_queue;
-    locks::LightweightSemaphore sema;
+  private:
+    std::mutex mutex_;
+    std::atomic<int32_t> m_count;
+    std::condition_variable cond_;
+  private:
+    void signal();
+    void wait();
+    bool try_wait();
 
   public:
     TaskQueue(uint64_t size);
@@ -22,8 +29,8 @@ class TaskQueue {
   public:
     bool enqueue(void* item);
     void wait_dequeue(void** item);
-    inline uint64_t size_approx() {
-      return limit_queue->size_approx() + unlimit_queue->size_approx();
+    inline uint64_t size() {
+      return m_count.load(std::memory_order_relaxed);
     }
   private:
     bool inner_dequeue(void** item);

@@ -18,7 +18,7 @@ static Node* NullNode = (Node*)0;
 static Node* TempNode = (Node*)1;
 static Node* TempNode2 = (Node*)2;
 __thread int32_t ExectorItem::thread_idx_ = -1;
-ExectorItem::ExectorItem(Thread* e): exec(e), sema(0), current_task_(nullptr), ready_task_(NullNode) {};
+ExectorItem::ExectorItem(Thread* e): exec(e), sema(), current_task_(nullptr), ready_task_(NullNode) {};
 ExectorItem::~ExectorItem() {delete exec;}
 
 Schedule::Schedule() {
@@ -273,7 +273,7 @@ void Schedule::record_task_finish() {
         quiet_flow::Metrics::emit_timer("quiet_flow.status.idle_worker_num", idle_worker_num_-1);
         quiet_flow::Metrics::emit_timer("quiet_flow.status.pending_worker_num", Node::pending_worker_num_);
         quiet_flow::Metrics::emit_timer("quiet_flow.status.ready_worker_num", ready_worker_num_);
-        quiet_flow::Metrics::emit_timer("quiet_flow.status.task_queue_length", inner_schedule->task_queue->size_approx());
+        quiet_flow::Metrics::emit_timer("quiet_flow.status.task_queue_length", inner_schedule->task_queue->size());
         quiet_flow::Metrics::emit_timer("quiet_flow.status.pending_context_num", ExecutorContext::pending_context_num_);
     }
     finish_cnt += 1;
@@ -285,7 +285,7 @@ void Schedule::record_task_finish() {
         oss << "#idle_worker_num:" << idle_worker_num_;
         oss << "#pending_worker_num:" <<  Node::pending_worker_num_;
         oss << "#ready_worker_num:" << ready_worker_num_;
-        oss << "#task_queue_length:" << inner_schedule->task_queue->size_approx();
+        oss << "#task_queue_length:" << inner_schedule->task_queue->size();
         oss << "#pending_context_num_:" << ExecutorContext::pending_context_num_;
         oss << "\n";
         std::cout << oss.str();
