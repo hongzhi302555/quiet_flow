@@ -28,22 +28,6 @@ void TaskQueue::signal() {
 }
 
 bool TaskQueue::try_wait() {
-  int32_t old_count = m_count.load(std::memory_order_relaxed);
-  while (old_count > 0) {
-    if (m_count.compare_exchange_strong(old_count, old_count - 1, std::memory_order_acquire, std::memory_order_relaxed)) {
-      return true;
-    }
-    old_count = m_count.load(std::memory_order_relaxed);
-  }
-
-  int spin = 10;
-  while (--spin >= 0) {
-    old_count = m_count.load(std::memory_order_relaxed);
-    if ((old_count > 0) && m_count.compare_exchange_strong(old_count, old_count - 1, std::memory_order_acquire, std::memory_order_relaxed)) {
-      return true;
-    }
-    std::atomic_signal_fence(std::memory_order_acquire);   // Prevent the compiler from collapsing the loop.
-  }
   return false;
 }
 
@@ -69,13 +53,9 @@ bool TaskQueue::enqueue(void* item) {
 }
 
 void TaskQueue::wait_dequeue(void** item) {
-  if (try_wait()) {
-    if (inner_dequeue(item)) {
+  if (inner_dequeue(item)) {
+      m_count.fetch_sub(1, std::memory_order_release);
       return;
-    } else {
-      // 虚假唤醒
-      signal();
-    }
   }
 
   wait(); // 虚假唤醒
