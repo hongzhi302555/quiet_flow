@@ -114,7 +114,7 @@ class NodeM: public Node {
 
         ScheduleAspect::require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 
-        sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get()});
+        sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get(), node_1.get()});
 
         // do somethings
 

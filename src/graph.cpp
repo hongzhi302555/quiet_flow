@@ -169,12 +169,19 @@ int Node::add_downstream(Node* node) {
     if (parent_graph == node->parent_graph) {
         // 判断是否加入 fast_down_streams
         if (node->node_id < Graph::fast_node_max_num) {
-            bit_map_set(fast_down_strams, node->node_id, Graph::fast_node_max_num);
+            // 防止重复加入
+            if (bit_map_get(fast_down_strams, node->node_id, Graph::fast_node_max_num)) {
+                if (1 == node->sub_wait_count()) {
+                    Schedule::add_new_task(node);
+                }
+            } else {
+                bit_map_set(fast_down_strams, node->node_id, Graph::fast_node_max_num);
+            }
+
             long int f_ = 0;
             mutex_.lock();
             f_ = fast_down_strams_bak;
             mutex_.unlock();
-
             if (f_ == Node::fast_down_strams_bak_init) {
                 // 本节点未结束
                 return 0;

@@ -107,7 +107,7 @@ class NodeM: public Node {
         auto sub_graph = get_graph();
         auto node_1 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-1-", 1), {nullptr}); // 插入任务
         auto node_2 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-2-", 3), {node_1.get()}); // node_2 依赖 node_1
-        auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get()});
+        auto node_3 = sub_graph->create_edges(new NodeDemo(name_for_debug + "-3-", 2), {node_1.get(),node_1.get()});
         sub_graph->create_edges(new NodeDemo("4", 3), {});
         sub_graph->create_edges([](Graph* sub_graph){
           std::cout << "lambda start\n";
