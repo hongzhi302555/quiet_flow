@@ -19,10 +19,12 @@ namespace quiet_flow{
 class Node; 
 namespace unit_test{class NodeTest;}
 class Schedule;
+class SelfQueue;
 
 class Graph {
   public:
     Graph(Node* p);
+    Graph(Node* p, size_t parallel, size_t queue_size);  // limit graph
     ~Graph();
     void clear_graph();
     void get_nodes(std::vector<Node*>& required_nodes);
@@ -32,17 +34,22 @@ class Graph {
     std::string dump(bool is_root);
   private:
     std::shared_ptr<Node> create_edges(std::shared_ptr<Node> new_node, const std::vector<Node*>& required_nodes);
-
+  friend class Node;
+  protected:
+    void ready(Node* node);
+    Node* finish(std::vector<Node*>& notified_nodes);
   public:
     static const uint64_t fast_node_max_num;
   private:
     uint64_t idx;
     std::mutex mutex_;
     Node* parent_node;
-
     uint64_t node_num;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Node>> fast_nodes;
+  private:
+    bool limit_graph;
+    SelfQueue* self_queue;
 };
 
 class Node {
@@ -59,24 +66,24 @@ class Node {
     virtual ~Node();
     void release();
     void create();
-
     static void block_thread_for_group(Graph* sub_graph); // 会阻塞当前线程, 慎用
  
   /* -------------- engine 执行需要的接口 -----------*/ 
   friend class Schedule;
   private:
-    static void init(){};
+    static void init() {};
     void resume();
     virtual void run() = 0;
-    void finish(std::vector<Node*>& notified_nodes);
+    Node* finish();
     void set_status(RunningStatus);
     RunningStatus loose_get_status() const {return status;}
-    virtual bool is_ghost() {return false;}   // ghost 节点，qf 执行完自动回收
+    inline bool is_ghost() {return ghost_;}   // ghost 节点，qf 执行完自动回收
 
   /* -------------- 子类使用的接口 -----------*/
   protected: 
     std::mutex mutex_;
     RunningStatus status;
+    bool ghost_ = false;
   public:
     Graph* get_graph();
 
@@ -109,18 +116,12 @@ class RootNode: public Node {
 public:
     RootNode() {
       root_node = this;
+      ghost_ = true;
       #ifdef QUIET_FLOW_DEBUG
       name_for_debug = "root_node";
       #endif
     }
     virtual ~RootNode() = default;
-    virtual bool is_ghost() override {
-      #ifdef QUIET_FLOW_DEBUG
-      return false;
-      #else
-      return true;
-      #endif 
-    }
 };
 
 }

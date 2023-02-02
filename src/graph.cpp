@@ -12,12 +12,144 @@ DECLARE_bool(enable_qf_dump_graph);
 
 namespace quiet_flow{
 
+class SelfQueue {
+  public:
+    SelfQueue(size_t parallel_, size_t queue_size_):limit_queue(queue_size_), parallel_quota(parallel_) {
+    }
+    ~SelfQueue() {
+    }
+
+    bool try_enqueue(Node* node) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (parallel_quota > 0) {
+            parallel_quota --;
+            return false;
+        }
+        if (not limit_queue.try_enqueue(node)) {
+            parallel_quota --;
+            return false;
+        }
+        return true;
+    }
+
+    bool try_dequeue(Node** node) {
+        if (limit_queue.try_dequeue((void**)node)) {
+            return true;
+        }
+
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (limit_queue.try_dequeue((void**)node)) {
+            return true;
+        }
+        parallel_quota ++; 
+        return false;
+    }
+
+  private:
+    queue::free_lock::LimitQueue limit_queue;
+    int parallel_quota;
+    std::mutex mutex_;
+};
+
+void Graph::ready(Node* node) {
+    if (limit_graph && self_queue->try_enqueue(node)) {
+        return;
+    }
+    Schedule::add_new_task(node);
+}
+
+Node* Graph::finish(std::vector<Node*>& notified_nodes) {
+    Node* next_task = nullptr;
+
+    if (!limit_graph) {
+        if (notified_nodes.empty()) {
+            return nullptr;
+        }
+
+        auto* temp_node = notified_nodes[0];
+        uint64_t i=1;
+        while (i < notified_nodes.size()) {
+            auto node = notified_nodes[i];
+            i ++;
+            if (!node->parent_graph->limit_graph) {
+                next_task = node;
+                break;
+            }
+            node->parent_graph->ready(node); 
+        }
+        while (i < notified_nodes.size()) {
+            auto node = notified_nodes[i];
+            i ++;
+            node->parent_graph->ready(node); 
+        }
+
+        if (next_task) {
+            temp_node->parent_graph->ready(temp_node); 
+            return next_task;
+        }
+        if (!temp_node->parent_graph->limit_graph) {
+            return temp_node;
+        }
+        if (!temp_node->parent_graph->self_queue->try_enqueue(temp_node)) {
+            return temp_node;
+        }
+        return nullptr;
+    }
+
+    if (notified_nodes.empty()) {
+        self_queue->try_dequeue(&next_task);
+        return next_task;
+    }
+
+    auto* temp_node = notified_nodes[0];
+    uint64_t i=1;
+    while (i < notified_nodes.size()) {
+        auto node = notified_nodes[i];
+        i ++;
+        if (node->parent_graph == this) {
+            next_task = node;
+            break;
+        }
+        node->parent_graph->ready(node); 
+    }
+    while (i < notified_nodes.size()) {
+        auto node = notified_nodes[i];
+        i ++;
+        node->parent_graph->ready(node); 
+    }
+
+    if (next_task) {
+        temp_node->parent_graph->ready(temp_node);
+        return next_task;
+    }
+    if (temp_node->parent_graph == this) {
+        return temp_node;
+    }
+    if (self_queue->try_dequeue(&next_task)) {
+        temp_node->parent_graph->ready(temp_node);
+        return next_task;
+    }
+    return temp_node;
+}
+
 const uint64_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
-Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){}
+Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){
+    limit_graph = false;
+}
+
+Graph::Graph(Node* p, size_t parallel, size_t queue_size):idx(0), parent_node(p), node_num(0) {
+    if (parallel < 30 && queue_size < (1<<15)) {
+        limit_graph = true;
+        self_queue = new SelfQueue(parallel, queue_size);
+    }
+}
 
 Graph::~Graph() {
     clear_graph();
+    if (limit_graph) {
+        delete self_queue;
+    }
 }
 
 void Graph::clear_graph(){
@@ -111,12 +243,12 @@ std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, con
                 r_node->add_downstream(new_node);         
             } else {                                      
                 if (1 == new_node->sub_wait_count()) {
-                    Schedule::add_new_task(new_node);
+                    new_node->parent_graph->ready(new_node);
                 }                                         
             }   
         }
     } else {
-        Schedule::add_new_task(new_node);
+        new_node->parent_graph->ready(new_node);
     }
 
     Node::append_upstreams(new_node, Node::flag_node);
@@ -148,7 +280,7 @@ protected:
 
 public:
     std::function<void()> lambda_holder;
-    
+
 public:
     struct NodeDelete {
         NodeDelete(queue::free_lock::LimitQueue& limit_queue_): limit_queue(limit_queue_){}
@@ -168,6 +300,8 @@ public:
         Pool(size_t size): limit_queue(size), node_delete(limit_queue) {}
     };
 };
+
+
 
 std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name) {
     static LambdaNode::Pool pool(1<<14);
@@ -195,27 +329,17 @@ void Node::set_status(RunningStatus s) {
     mutex_.unlock();
 }
 
-void Node::append_upstreams(Node* self_node, const Node* node) {
-    #ifdef QUIET_FLOW_DEBUG
-    self_node->up_streams.push_back(node);
-    #else
-    if (FLAGS_enable_qf_check_circle || FLAGS_enable_qf_dump_graph) {
-        self_node->up_streams.push_back(node);
-    }
-    #endif
-}
-
 int Node::add_downstream(Node* node) {
     if (this == node) {
         if (1 == node->sub_wait_count()) {
-            Schedule::add_new_task(node);
+            node->parent_graph->ready(node);
         }
         return -1;
     }
 
     if (status >= RunningStatus::Finish) {
         if (1 == node->sub_wait_count()) {
-            Schedule::add_new_task(node);
+            node->parent_graph->ready(node);
         }
         return -1;
     }
@@ -226,7 +350,7 @@ int Node::add_downstream(Node* node) {
             // 防止重复加入
             if (bit_map_get(fast_down_strams, node->node_id, Graph::fast_node_max_num)) {
                 if (1 == node->sub_wait_count()) {
-                    Schedule::add_new_task(node);
+                    node->parent_graph->ready(node);
                 }
             } else {
                 bit_map_set(fast_down_strams, node->node_id, Graph::fast_node_max_num);
@@ -242,7 +366,7 @@ int Node::add_downstream(Node* node) {
             }
             if (!bit_map_get(f_, node->node_id, Graph::fast_node_max_num)) {
                 if (1 == node->sub_wait_count()) {
-                    Schedule::add_new_task(node);
+                    node->parent_graph->ready(node);
                 }
                 return -1;
             }
@@ -254,7 +378,7 @@ int Node::add_downstream(Node* node) {
     if (status >= RunningStatus::Finish) {
         mutex_.unlock();
         if (1 == node->sub_wait_count()) {
-            Schedule::add_new_task(node);
+            node->parent_graph->ready(node);
         }
         return -1;
     }
@@ -264,6 +388,15 @@ int Node::add_downstream(Node* node) {
     return 0;
 }
 
+void Node::append_upstreams(Node* self_node, const Node* node) {
+    #ifdef QUIET_FLOW_DEBUG
+    self_node->up_streams.push_back(node);
+    #else
+    if (FLAGS_enable_qf_check_circle || FLAGS_enable_qf_dump_graph) {
+        self_node->up_streams.push_back(node);
+    }
+    #endif
+}
 
 std::string Graph::dump(bool is_root) {
     if (!FLAGS_enable_qf_dump_graph) {

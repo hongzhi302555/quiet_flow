@@ -144,8 +144,8 @@ class NodeM: public Node {
 int run(int thread_cnt) {
     Schedule::init(thread_cnt);
 
-    Graph* g = new Graph(nullptr);
-    for (int i=0; i<1000; i++) {
+    Graph* g = new Graph(nullptr, 5, 4096);
+    for (int i=0; i<3000; i++) {
         g->create_edges(new NodeM(std::to_string(i)), {});
     }
     Node::block_thread_for_group(g);

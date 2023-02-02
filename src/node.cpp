@@ -43,7 +43,6 @@ void Node::create() {
         debug_mutex.unlock();
     }
     #endif
-
     // sub_graph = new Graph(this);
     sub_graph = nullptr;
     status = RunningStatus::Initing;
@@ -111,9 +110,11 @@ int Node::add_wait_count(int upstream_count) {
     return wait_count.fetch_add(upstream_count, std::memory_order_relaxed);
 }
 
-void Node::finish(std::vector<Node*>& notified_nodes) {
+Node* Node::finish() {
+    QuietFlowAssert(status == RunningStatus::Running);
     status = RunningStatus::Finish;
 
+    std::vector<Node*> notified_nodes;
     mutex_.lock();
     notified_nodes.reserve(down_streams.size());
     /*          T1                              T2 (add_downstream)
@@ -141,6 +142,8 @@ void Node::finish(std::vector<Node*>& notified_nodes) {
         }
     }
     mutex_.unlock();
+
+    return parent_graph->finish(notified_nodes);
 }
 
 class NodeRunWaiter: public Node {
@@ -159,8 +162,11 @@ class NodeRunWaiter: public Node {
 };
 
 void Node::block_thread_for_group(Graph* sub_graph) {
-    // 会阻塞当前线程, 慎用
+    if (Schedule::safe_get_cur_exec()) {
+        quiet_flow::ScheduleAspect::wait_graph(sub_graph);
+    }
 
+    // 会阻塞当前线程, 慎用
     std::vector<Node*> required_nodes;
     sub_graph->get_nodes(required_nodes);
 

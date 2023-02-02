@@ -223,24 +223,18 @@ void Schedule::run_task(Node* task) {
         #endif
 
         Schedule::get_cur_exec()->set_current_task(task);
+        QuietFlowAssert(task->loose_get_status() == RunningStatus::Initing);
         task->set_status(RunningStatus::Ready);
         task->resume();
         
-        std::vector<Node*> notified_nodes;
-        task->finish(notified_nodes);
+        Node* next_task = task->finish();
         if (task->is_ghost()) {
             task->release();
             delete task;
         }
+        QuietFlowAssert(task->loose_get_status() == RunningStatus::Finish);
         task->set_status(RunningStatus::Recoverable);
-        task = nullptr;
-
-        if (notified_nodes.size() > 0) {
-            task = notified_nodes[0];
-            for (uint64_t i=1; i< notified_nodes.size(); i++) {
-                add_new_task(notified_nodes[i]);
-            }
-        }
+        task = next_task;
         record_task_finish();
     }
 }
