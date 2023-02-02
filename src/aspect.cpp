@@ -19,10 +19,13 @@ class BackNode: public Node {
     RunningStatus self_status;
     Node* back_task;
     std::shared_ptr<ExecutorContext> back_run_context_ptr;
+    const std::vector<Node*>* wait_nodes_ptr = nullptr; // 串起 node 为了 debug 使用
   public:
     BackNode(const std::string& debug_name="") {
         self_status = RunningStatus::Initing;
+        #ifdef QUIET_FLOW_DEBUG
         name_for_debug = "back_node@" + debug_name;
+        #endif
     }
     ~BackNode() {
         #ifdef QUIET_FLOW_DEBUG
@@ -131,6 +134,8 @@ void ScheduleAspect::Assistant::require_node(const std::vector<Node*>& nodes, co
             back_node->self_status = RunningStatus::Ready;
 
             sub_graph_->create_edges(back_node, nodes);
+            back_node->wait_nodes_ptr = &nodes;
+
             current_task->set_status(RunningStatus::Yield); 
             current_task->require_sub_graph = true;
             std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
