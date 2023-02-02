@@ -30,6 +30,9 @@ class Graph {
     std::shared_ptr<Node> create_edges(Node* new_node, const std::vector<Node*>& required_nodes);
     std::shared_ptr<Node> create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name = "");
     std::string dump(bool is_root);
+  private:
+    std::shared_ptr<Node> create_edges(std::shared_ptr<Node> new_node, const std::vector<Node*>& required_nodes);
+
   public:
     static const uint64_t fast_node_max_num;
   private:
@@ -54,13 +57,15 @@ class Node {
   public:
     Node();
     virtual ~Node();
-    virtual void release() final;
+    void release();
+    void create();
+
     static void block_thread_for_group(Graph* sub_graph); // 会阻塞当前线程, 慎用
  
   /* -------------- engine 执行需要的接口 -----------*/ 
   friend class Schedule;
   private:
-    static void init();
+    static void init(){};
     void resume();
     virtual void run() = 0;
     void finish(std::vector<Node*>& notified_nodes);
@@ -91,8 +96,7 @@ class Node {
     std::vector<Node*> down_streams;
     std::atomic<int> wait_count;
   private:
-    typedef void (*append_upstreams_func)(Node*, const Node*);
-    static append_upstreams_func append_upstreams; // 性能优化
+    static void append_upstreams(Node*, const Node*);
     int add_wait_count(int upstream_count);
     int add_downstream(Node* node);
     int sub_wait_count();

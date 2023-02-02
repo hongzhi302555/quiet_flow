@@ -6,12 +6,11 @@
 #include "head/node.h"
 #include "head/schedule.h"
 #include "head/aspect.h"
+#include "head/queue/free_lock.h"
 
 DECLARE_bool(enable_qf_dump_graph);
 
 namespace quiet_flow{
-
-Node::append_upstreams_func Node::append_upstreams = nullptr;
 
 const uint64_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
@@ -80,6 +79,11 @@ Node* Graph::get_node(uint64_t idx) {
 std::shared_ptr<Node> Graph::create_edges(Node* new_node, const std::vector<Node*>& required_nodes) {
     std::shared_ptr<Node> shared_node;
     shared_node.reset(new_node);
+    return create_edges(shared_node, required_nodes);
+}
+
+std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, const std::vector<Node*>& required_nodes) {
+    Node* new_node = shared_node.get();
     if (parent_node) {
         new_node->root_node = parent_node->root_node;
     }
@@ -130,6 +134,11 @@ public:
       name_for_debug = debug_name;
       #endif
     }
+    ~LambdaNode() {
+      #ifdef QUIET_FLOW_DEBUG
+      std::cout << "LambdaNode delete" << std::endl;
+      #endif
+    }
 
 protected:
     virtual void run(){
@@ -137,18 +146,63 @@ protected:
       ScheduleAspect::wait_graph(this->get_graph());
     }
 
-private:
+public:
     std::function<void()> lambda_holder;
+    
+public:
+    struct NodeDelete {
+        NodeDelete(queue::free_lock::LimitQueue& limit_queue_): limit_queue(limit_queue_){}
+        queue::free_lock::LimitQueue& limit_queue;
+        void operator()(LambdaNode *o) {
+            o->release();
+            if (limit_queue.try_enqueue(o)) {
+                o->pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+            } else {
+                delete o;
+            }
+        }
+    };
+    struct Pool {
+        queue::free_lock::LimitQueue limit_queue;
+        NodeDelete node_delete;
+        Pool(size_t size): limit_queue(size), node_delete(limit_queue) {}
+    };
 };
 
 std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name) {
-    return create_edges(new quiet_flow::LambdaNode(std::move(callable), debug_name), required_nodes);
+    static LambdaNode::Pool pool(1<<14);
+
+    LambdaNode* node = nullptr;
+    if (pool.limit_queue.try_dequeue((void**)&node)) {
+        node->create();
+        node->pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
+        #ifdef QUIET_FLOW_DEBUG
+        node->name_for_debug = debug_name;
+        #endif
+        node->lambda_holder = [sub_graph=node->get_graph(), callable=std::move(callable)]() {callable(sub_graph);};
+    } else {
+        node = new quiet_flow::LambdaNode(std::move(callable), debug_name);
+    }
+    return create_edges(std::shared_ptr<Node>(node, pool.node_delete), required_nodes);
+
+    // node = new quiet_flow::LambdaNode(std::move(callable), debug_name);
+    // return create_edges(node, required_nodes);
 }
 
 void Node::set_status(RunningStatus s) {
     mutex_.lock();
     status = s;
     mutex_.unlock();
+}
+
+void Node::append_upstreams(Node* self_node, const Node* node) {
+    #ifdef QUIET_FLOW_DEBUG
+    self_node->up_streams.push_back(node);
+    #else
+    if (FLAGS_enable_qf_check_circle || FLAGS_enable_qf_dump_graph) {
+        self_node->up_streams.push_back(node);
+    }
+    #endif
 }
 
 int Node::add_downstream(Node* node) {
@@ -210,17 +264,6 @@ int Node::add_downstream(Node* node) {
     return 0;
 }
 
-void Node::init() {
-    #ifdef QUIET_FLOW_DEBUG
-    append_upstreams = [](Node* self_node, const Node* node){self_node->up_streams.push_back(node);};
-    #else
-    if (FLAGS_enable_qf_check_circle || FLAGS_enable_qf_dump_graph) {
-        append_upstreams = [](Node* self_node, const Node* node){self_node->up_streams.push_back(node);};
-    } else {
-        append_upstreams = [](Node*, const Node* node){};
-    }
-    #endif
-}
 
 std::string Graph::dump(bool is_root) {
     if (!FLAGS_enable_qf_dump_graph) {

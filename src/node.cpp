@@ -22,7 +22,7 @@ std::atomic<int> Node::pending_worker_num_;
 
 class FlagNode: public Node {
   public:
-    FlagNode() {pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);};
+    FlagNode() = default;
     ~FlagNode() = default;
     void run() {}
 };
@@ -30,6 +30,11 @@ class FlagNode: public Node {
 Node* Node::flag_node = new FlagNode();
 
 Node::Node() {
+    create();
+    pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void Node::create() {
     #ifdef QUIET_FLOW_DEBUG
     name_for_debug = "node";
     {
@@ -38,15 +43,17 @@ Node::Node() {
         debug_mutex.unlock();
     }
     #endif
+
     // sub_graph = new Graph(this);
     sub_graph = nullptr;
     status = RunningStatus::Initing;
     wait_count = 0;
     parent_graph = nullptr;
+    up_streams.clear();
+    down_streams.clear();
 
     fast_down_strams = 0;
     fast_down_strams_bak = fast_down_strams_bak_init;
-    pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Node::release() {
