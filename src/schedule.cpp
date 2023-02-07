@@ -18,7 +18,7 @@ static Node* NullNode = (Node*)0;
 static Node* TempNode = (Node*)1;
 static Node* TempNode2 = (Node*)2;
 __thread int32_t ExectorItem::thread_idx_ = -1;
-ExectorItem::ExectorItem(Thread* e): exec(e), sema(), current_task_(nullptr), ready_task_(NullNode) {};
+ExectorItem::ExectorItem(Thread* e): exec(e), current_task_(nullptr), ready_task_(NullNode) {};
 ExectorItem::~ExectorItem() {delete exec;}
 
 Schedule::Schedule() {
@@ -155,7 +155,6 @@ void Schedule::destroy() {
     }
 
     for (uint64_t i=0; i< thread_exec_vec.size(); i++) {
-        thread_exec_vec[i]->signal();
         if (thread_exec_vec[i]) {
             delete thread_exec_vec[i];
             thread_exec_vec[i] = nullptr;

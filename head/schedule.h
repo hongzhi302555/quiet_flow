@@ -4,7 +4,6 @@
 #include <mutex>
 #include <ucontext.h>
 #include <unordered_map>
-#include "head/locks/thread.h"
 
 #ifdef LOCAL_QUEUE
 #include "head/queue/task.h"
@@ -13,6 +12,7 @@
 #endif
 
 #include "head/util.h"
+#include "head/locks/thread.h"
 
 DECLARE_int32(backup_coroutines);  // "number of coroutine pool"
 
@@ -28,9 +28,9 @@ class ExectorItem {
     static __thread int32_t thread_idx_;
   private:
     Thread* exec;
-    locks::LightweightSemaphore sema;
     Node* current_task_;
     std::atomic<Node*> ready_task_;
+    locks::Semaphore sema;
   public:
     ExectorItem(Thread* e);
     ~ExectorItem();

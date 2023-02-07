@@ -11,11 +11,11 @@ class TaskQueue {
   private:
     AbstractQueue* limit_queue;
     AbstractQueue* unlimit_queue;
+    AbstractQueue* worker_queue;
   private:
     std::mutex mutex_;
     std::condition_variable cond_;
     std::atomic<int32_t> m_count;
-    std::atomic<int32_t> sleep_count;
   private:
     void signal();
     void wait();

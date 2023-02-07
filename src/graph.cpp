@@ -14,40 +14,30 @@ namespace quiet_flow{
 
 class SelfQueue {
   public:
-    SelfQueue(size_t parallel_, size_t queue_size_):limit_queue(queue_size_), parallel_quota(parallel_) {
+    SelfQueue(size_t parallel_, size_t queue_size_):limit_queue(queue_size_), m_count(-1*parallel_) {
     }
     ~SelfQueue() {
     }
 
     bool try_enqueue(Node* node) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        if (parallel_quota > 0) {
-            parallel_quota --;
-            return false;
+        int32_t old_count = m_count.fetch_add(1, std::memory_order_release);
+        if (old_count >= 0) {
+            return limit_queue.try_enqueue(node);
         }
-        if (not limit_queue.try_enqueue(node)) {
-            parallel_quota --;
-            return false;
-        }
-        return true;
+        return false;
     }
 
     bool try_dequeue(Node** node) {
+        m_count.fetch_sub(1, std::memory_order_release);
         if (limit_queue.try_dequeue((void**)node)) {
             return true;
         }
-
-        std::unique_lock<std::mutex> lock(mutex_);
-        if (limit_queue.try_dequeue((void**)node)) {
-            return true;
-        }
-        parallel_quota ++; 
         return false;
     }
 
   private:
     queue::free_lock::LimitQueue limit_queue;
-    int parallel_quota;
+    std::atomic<int32_t> m_count;
     std::mutex mutex_;
 };
 
