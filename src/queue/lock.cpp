@@ -9,15 +9,6 @@
 
 namespace quiet_flow{
 namespace queue{
-
-uint64_t align_queue_size(uint64_t size) {
-    size *= sizeof(void*);
-    size += (size & 4095) ? 4096 : 0;
-    size &= ~(uint64_t)(4095);
-    size /= sizeof(void*);
-    return size;
-}
-
 namespace lock{
 
 uint64_t LimitQueue::size_approx() {

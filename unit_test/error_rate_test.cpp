@@ -300,5 +300,182 @@ TEST_F(TestErrorRate, test_error_cnt_3) {
   r->container[1] = 0xc007000c01040c04;
   EXPECT_EQ(r->error_cnt(), 22);
 }
+
+TEST_F(TestErrorRate, test_record_hl_3) {
+  auto* r = new LocalErrorRate(256);
+
+  r->idx.store(190);
+
+  int cnt = 1;
+  r->record_error();
+  EXPECT_EQ(r->container[2], 0x4000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(r->container[2], 0xc000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  auto& c = r->container[3];
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b100111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+}
+
+TEST_F(TestErrorRate, test_record_hl_3_back) {
+  auto* r = new LocalErrorRate(256);
+
+  r->idx.store(446);
+
+  int cnt = 1;
+  r->record_error();
+  EXPECT_EQ(r->container[2], 0x4000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(r->container[2], 0xc000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  auto& c = r->container[3];
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b100111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+}
+
+TEST_F(TestErrorRate, test_record_hl_4) {
+  auto* r = new LocalErrorRate(512);
+
+  r->idx.store(446);
+
+  int cnt = 1;
+  r->record_error();
+  EXPECT_EQ(r->container[6], 0x4000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(r->container[6], 0xc000000000000000);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  auto& c = r->container[7];
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11);
+  EXPECT_EQ(r->error_cnt(), cnt);
+  
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b1111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b11111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  r->record_success();
+  EXPECT_EQ(c, 0b111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+
+  cnt ++;
+  r->record_error();
+  EXPECT_EQ(c, 0b100111111);
+  EXPECT_EQ(r->error_cnt(), cnt);
+}
 }
 } //set namespace

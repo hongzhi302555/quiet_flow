@@ -21,14 +21,6 @@ class TestLockQueueInit: public ::testing::Test {
     static void TearDownTestCase() {}
 };
 
-TEST_F(TestLockQueueInit, test_align_queue_size) {
-  EXPECT_EQ(512, align_queue_size(6));
-  EXPECT_EQ(512, align_queue_size(511));
-  EXPECT_EQ(512, align_queue_size(512));
-  EXPECT_EQ(1024, align_queue_size(513));
-  EXPECT_EQ(1024, align_queue_size(515));
-}
-
 TEST_F(TestLockQueueInit, circular_less) {
   EXPECT_FALSE(circular_less(0, 0));
   EXPECT_TRUE(circular_less(0-10, 0));

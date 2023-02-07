@@ -30,7 +30,7 @@ class LimitQueue: public AbstractQueue {
     }
   public:
     LimitQueue(uint64_t size) {
-      capacity = align_queue_size(size);
+      capacity = align_size(size);
       #ifdef QUIET_FLOW_DEBUG
       vec.resize(capacity);
       #else

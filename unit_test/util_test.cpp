@@ -110,5 +110,17 @@ TEST_F(TestInit, test_set) {
 
   EXPECT_THROW(bit_map_idx(bit_map, 64, vec_s), std::runtime_error);
 }
+
+TEST_F(TestInit, test_align_size) {
+  EXPECT_EQ(8, align_size(6));
+  EXPECT_EQ(512, align_size(511));
+  EXPECT_EQ(512, align_size(512));
+  EXPECT_EQ(1024, align_size(513));
+  EXPECT_EQ(1024, align_size(515));
+  EXPECT_EQ(2048, align_size(1025));
+  EXPECT_EQ(4096, align_size(2049));
+  EXPECT_EQ(4096, align_size(4096));
+  EXPECT_EQ(8192, align_size(4097));
+}
 }
 } //set namespace

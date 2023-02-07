@@ -34,4 +34,10 @@ bool bit_map_get(const long int bit_map, uint64_t bit, uint64_t bit_size) {
 
     return (bit_map & ((long int)0x1 << bit)) > 0;
 }
+
+uint64_t align_size(uint64_t size) {
+    auto first_bit = std::__lg(size);
+    return ((1<<first_bit) == size) ? size : (1<<(first_bit+1));
+}
+
 }

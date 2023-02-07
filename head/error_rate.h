@@ -1,17 +1,17 @@
-#include <unistd.h>
-#include <ucontext.h>
 #include <atomic>
 
 namespace quiet_flow{
+
+using uint64_t = unsigned long long;
+
 class LocalErrorRate {
 private:
     std::atomic<uint64_t> idx;
-    std::atomic<uint64_t> container[2];
-    LocalErrorRate() {
-        idx.store(0, std::memory_order_relaxed);
-        container[0].store(0, std::memory_order_relaxed);
-        container[1].store(0, std::memory_order_relaxed);
-    }
+    std::atomic<uint64_t>* container;
+    size_t bit_size;
+    int high_bit;
+private:
+    LocalErrorRate(int bit_size_ = 128);
     size_t error_cnt();
 public:
     void record_error();
