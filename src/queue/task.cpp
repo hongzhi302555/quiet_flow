@@ -42,7 +42,7 @@ bool TaskQueue::try_get(void** item) {
 
 void TaskQueue::wait() {
   std::unique_lock<std::mutex> lock(mutex_);
-  if (m_count.load(std::memory_order_release) > 0) {
+  if (m_count.load(std::memory_order_release) < 0) {
     return;
   }
   sleep_count.fetch_add(1, std::memory_order_release);
