@@ -8,7 +8,6 @@
 namespace quiet_flow{
 
 Schedule* Schedule::inner_schedule = nullptr;
-std::vector<uint8_t> Schedule::thread_exec_bit_map;
 std::vector<ExectorItem*> Schedule::thread_exec_vec;
 std::mutex Schedule::mutex_;
 std::atomic<int> Schedule::idle_worker_num_;
@@ -18,18 +17,13 @@ static Node* NullNode = (Node*)0;
 static Node* TempNode = (Node*)1;
 static Node* TempNode2 = (Node*)2;
 __thread int32_t ExectorItem::thread_idx_ = -1;
-ExectorItem::ExectorItem(Thread* e): exec(e), current_task_(nullptr), ready_task_(NullNode) {};
+ExectorItem::ExectorItem(Thread* e): exec(e), current_task_(nullptr) {};
 ExectorItem::~ExectorItem() {delete exec;}
 
 Schedule::Schedule() {
     status = RunningStatus::Initing;
     root_graph = new Graph(nullptr);
-    // task_queue_length = 0;
-    #ifdef LOCAL_QUEUE
     task_queue = new queue::task::TaskQueue(4096);
-    #else
-    task_queue = new ConcurrentQueue<Node*>();
-    #endif
 }
 
 Schedule::~Schedule() {
@@ -46,14 +40,10 @@ Schedule::~Schedule() {
 
 void Schedule::init_work_thread(uint64_t worker_num, void (*func)(Thread*)) {
     thread_exec_vec.clear();
-    thread_exec_bit_map.resize(0);
 
     worker_num += (worker_num & 7) ? 8 : 0;
     worker_num &= ~(uint64_t)7;
     
-    for (uint64_t i=0; i<(worker_num >> 3); i++) {
-        thread_exec_bit_map.push_back(0);
-    }
     thread_exec_vec.reserve(worker_num);
     for (uint64_t i=0; i<worker_num; i++) {
         new Thread(func);
@@ -160,7 +150,6 @@ void Schedule::destroy() {
             thread_exec_vec[i] = nullptr;
         }
     }
-    thread_exec_bit_map.clear();
     thread_exec_vec.clear();
     idle_worker_num_.store(0, std::memory_order_relaxed);
 
@@ -241,11 +230,7 @@ void Schedule::run_task(Node* task) {
 void Schedule::do_schedule() {
     Node *task = nullptr;
     while (true) {  // manual loop unrolling
-        #ifdef LOCAL_QUEUE
         task_queue->wait_dequeue((void**)(&task));
-        #else
-        task_queue->wait_dequeue(task);
-        #endif
         if (task == Node::flag_node) break;
         // task_queue_length.fetch_sub(1, std::memory_order_relaxed);
 

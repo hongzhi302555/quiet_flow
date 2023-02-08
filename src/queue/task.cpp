@@ -21,9 +21,9 @@ TaskQueue::TaskQueue(uint64_t size):m_count(0) {
 }
 
 void TaskQueue::signal() {
-  int32_t old_count = m_count.fetch_sub(1, std::memory_order_release);
+  int32_t old_count = m_count.fetch_add(1, std::memory_order_release);
 
-  bool to_release = old_count <= 0; // 说明自旋无法消化
+  bool to_release = old_count >= 0; // 说明自旋无法消化
   void* item = nullptr;
   if (to_release && (worker_queue->try_dequeue(&item))) {
     ((ExectorItem*)item)->signal();
@@ -31,7 +31,7 @@ void TaskQueue::signal() {
 }
 
 bool TaskQueue::try_get(void** item) {
-  m_count.fetch_add(1, std::memory_order_release);
+  m_count.fetch_sub(1, std::memory_order_release);
 
   int spin = 30;
   while (--spin >= 0) {
@@ -39,12 +39,12 @@ bool TaskQueue::try_get(void** item) {
       return true;
     }
   }
-  m_count.fetch_sub(1, std::memory_order_release);
+  m_count.fetch_add(1, std::memory_order_release);
   return false;
 }
 
 void TaskQueue::wait() {
-  if (m_count.load(std::memory_order_release) < 0) {
+  if (m_count.load(std::memory_order_release) > 0) {
     return;
   }
   auto exec = Schedule::get_cur_exec();

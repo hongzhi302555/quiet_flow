@@ -77,13 +77,13 @@ void f(TestFreeLockQueueConEn* t, int v) {
     queue.try_enqueue(new int(i+100));
   }
   EXPECT_EQ(queue.size_approx(), fill_size);
-  EXPECT_EQ(queue.tail, fill_size);
-  EXPECT_EQ(queue.head, 0);
-  // EXPECT_FALSE(queue.is_full(queue.head, queue.tail));
+  EXPECT_EQ(queue.write, fill_size);
+  EXPECT_EQ(queue.read, 0);
+  // EXPECT_FALSE(queue.is_full(queue.read, queue.write));
 
   t->i.store(1, std::memory_order_relaxed);
   t->wait_group();
-  // EXPECT_TRUE(queue.is_full(queue.head, queue.tail));
+  // EXPECT_TRUE(queue.is_full(queue.read, queue.write));
 
   std::unordered_set<int> s;
   void* m;
@@ -98,7 +98,7 @@ void f(TestFreeLockQueueConEn* t, int v) {
   queue.try_dequeue(&m);
   s.insert(*(int*)m);
 
-  // EXPECT_TRUE(queue.is_empty(queue.head, queue.tail));
+  // EXPECT_TRUE(queue.is_empty(queue.read, queue.write));
 
   for (int i=0; i<t->res.size(); i++) {
     if (t->res[i]) {
@@ -189,14 +189,14 @@ void f(TestFreeLockQueueConDe* t, int fill_size) {
     queue.try_enqueue(new int(i+100));
   }
   EXPECT_EQ(queue.size_approx(), fill_size);
-  EXPECT_EQ(queue.tail, fill_size);
-  EXPECT_EQ(queue.head, 0);
-  // EXPECT_FALSE(queue.is_empty(queue.head, queue.tail));
+  EXPECT_EQ(queue.write, fill_size);
+  EXPECT_EQ(queue.read, 0);
+  // EXPECT_FALSE(queue.is_empty(queue.read, queue.write));
 
   t->i.store(1, std::memory_order_relaxed);
   t->wait_group();
-  EXPECT_EQ(queue.head, fill_size);
-  // EXPECT_TRUE(queue.is_empty(queue.head, queue.tail));
+  EXPECT_EQ(queue.read, fill_size);
+  // EXPECT_TRUE(queue.is_empty(queue.read, queue.write));
 
   for (int i=0; i<t->res.size(); i++) {
     if (t->res[i]) {
@@ -304,7 +304,7 @@ void f(TestFreeLockQueueConEnDe* t, int en, int de) {
       en_t ++;
     }
   }
-  EXPECT_EQ(queue.tail, en_t);
+  EXPECT_EQ(queue.write, en_t);
   if (en <= 8) {
     EXPECT_EQ(en, en_t);
   }
@@ -318,7 +318,7 @@ void f(TestFreeLockQueueConEnDe* t, int en, int de) {
     }
   }
 
-  EXPECT_EQ(queue.head, de_t);
+  EXPECT_EQ(queue.read, de_t);
   EXPECT_TRUE(de_t <= en_t);
   EXPECT_EQ(queue.size_approx(), (en_t - de_t));
 
