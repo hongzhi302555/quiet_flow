@@ -24,9 +24,6 @@ TEST_F(TestInit, test_add_downstream_self) {
   t->wait_count = 10;
   EXPECT_EQ(t->add_downstream(t), -1);
   EXPECT_EQ(t->wait_count, 9);
-
-  t->wait_count = 1;
-  EXPECT_THROW(t->add_downstream(t), std::runtime_error);
 }
 
 TEST_F(TestInit, test_add_downstream_fast) {

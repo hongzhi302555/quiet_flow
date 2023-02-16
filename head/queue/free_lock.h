@@ -20,22 +20,22 @@ class LimitQueue: public AbstractQueue {
     uint64_t capacity_bitmap = 0;
     std::atomic<uint64_t>* flag_vec;
 
-		std::atomic<uint64_t> head;
-		std::atomic<uint64_t> head_missed;
-		std::atomic<uint64_t> head_ahead;
-		std::atomic<uint64_t> tail;
-		std::atomic<uint64_t> tail_missed;
-		std::atomic<uint64_t> tail_ahead;
+		std::atomic<uint64_t> read;
+		std::atomic<uint64_t> read_missed;
+		std::atomic<uint64_t> read_ahead;
+		std::atomic<uint64_t> write;
+		std::atomic<uint64_t> write_missed;
+		std::atomic<uint64_t> write_ahead;
   private:
-    inline bool is_empty(uint64_t head_, uint64_t tail_) {
-      uint64_t diff = head_ - tail_;
+    inline bool is_empty(uint64_t read_, uint64_t write_) {
+      // read_ == write_
+      uint64_t diff = read_ - write_;
       return (diff >= 0) && (diff < (uint64_t)(0xffffffff));
-      // return circular_less(tail, head+1);
     }
-    inline bool is_full(uint64_t head_, uint64_t tail_) {
-      uint64_t diff = tail_ - capacity - head_;
+    inline bool is_full(uint64_t read_, uint64_t write_) {
+      // write - read_ = capacity
+      uint64_t diff = write_ - capacity - read_;
       return (diff >= 0) && (diff < (uint64_t)(0xffffffff));
-      // return circular_less(head_+1, tail_ - capacity);
     }
   public:
     LimitQueue(uint64_t size);

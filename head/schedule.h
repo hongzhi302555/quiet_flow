@@ -4,15 +4,10 @@
 #include <mutex>
 #include <ucontext.h>
 #include <unordered_map>
-#include "head/locks/thread.h"
 
-#ifdef LOCAL_QUEUE
 #include "head/queue/task.h"
-#else
-#include "head/cpp3rd/concurrentqueue.h"
-#endif
-
 #include "head/util.h"
+#include "head/locks/thread.h"
 
 DECLARE_int32(backup_coroutines);  // "number of coroutine pool"
 
@@ -28,9 +23,8 @@ class ExectorItem {
     static __thread int32_t thread_idx_;
   private:
     Thread* exec;
-    locks::LightweightSemaphore sema;
     Node* current_task_;
-    std::atomic<Node*> ready_task_;
+    locks::Semaphore sema;
   public:
     ExectorItem(Thread* e);
     ~ExectorItem();
@@ -47,7 +41,6 @@ class Schedule {
   private:
     static Schedule* inner_schedule;
     static std::mutex mutex_;
-    static std::vector<uint8_t> thread_exec_bit_map;
     static std::vector<ExectorItem*> thread_exec_vec;
     static std::atomic<int> idle_worker_num_;
     static std::atomic<int> ready_worker_num_;
@@ -83,12 +76,7 @@ class Schedule {
   private:
     Graph* root_graph;
     RunningStatus status;
-    // std::atomic<uint64_t> task_queue_length;
-    #ifdef LOCAL_QUEUE
     queue::task::TaskQueue* task_queue;
-    #else
-    ConcurrentQueue<Node*>* task_queue;
-    #endif
 };
 
 }

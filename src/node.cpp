@@ -1,5 +1,5 @@
 #include <cxxabi.h>
-#include "iostream"
+#include <iostream>
 #include <gflags/gflags.h>
 #include <unordered_set>
 
@@ -148,16 +148,15 @@ Node* Node::finish() {
 
 class NodeRunWaiter: public Node {
   public:
-    sem_t sem;
+    locks::Semaphore sema;
   public:
     NodeRunWaiter() {
         #ifdef QUIET_FLOW_DEBUG
         name_for_debug += "--waiter";
         #endif
-        sem_init(&sem, 0, 0);
     }
     void run() {
-        sem_post(&sem);
+        sema.signal();
     }
 };
 
@@ -177,8 +176,7 @@ void Node::block_thread_for_group(Graph* sub_graph) {
     Graph g(nullptr);
     NodeRunWaiter* waiter = new NodeRunWaiter();
     g.create_edges(waiter, required_nodes); // 插入任务
-
-    sem_wait(&waiter->sem);
+    waiter->sema.wait();
 }
 
 std::string Node::node_debug_name(std::string postfix) const {

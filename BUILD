@@ -35,7 +35,6 @@ cc_library(
         "-Wno-unused-local-typedefs", "-Wno-unused-function",
         "-Wno-unused-parameter", "-Wno-unused-variable",
         "-Wno-comment", "-ftemplate-depth=9000",
-        "-D LOCAL_QUEUE",
         "-fopenmp",
         # "-D QUIET_FLOW_DEBUG",
     ],

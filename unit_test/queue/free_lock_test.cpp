@@ -59,7 +59,7 @@ TEST_F(TestFreeLockQueueInit, test_enqueue) {
   EXPECT_EQ(queue.size_approx(), size+1);
   EXPECT_TRUE(queue.try_enqueue(new int(1)));
   EXPECT_EQ(queue.size_approx(), size+2);
-  EXPECT_TRUE(queue.is_full(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_full(queue.read, queue.write));
   EXPECT_FALSE(queue.try_enqueue(new int(1)));
 }
 
@@ -68,14 +68,14 @@ TEST_F(TestFreeLockQueueInit, test_dequeue) {
   for (auto i=0; i<8; i++) {
     queue.try_enqueue(new int(i));
   }
-  EXPECT_TRUE(queue.is_full(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_full(queue.read, queue.write));
   for (auto i=0; i<8; i++) {
     void* m;
     EXPECT_TRUE(queue.try_dequeue(&m));
     EXPECT_EQ(queue.size_approx(), 7-i);
     EXPECT_EQ(*(int*)m, i);
   }
-  EXPECT_TRUE(queue.is_empty(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_empty(queue.read, queue.write));
   void* m;
   EXPECT_FALSE(queue.try_dequeue(&m));
   EXPECT_FALSE(queue.try_dequeue(&m));
@@ -94,7 +94,7 @@ void f(LimitQueue& queue, int t) {
       EXPECT_TRUE(queue.try_dequeue(&m));
       EXPECT_EQ(*(int*)m, i*(j+1));
     }
-    EXPECT_TRUE(queue.is_empty(queue.head, queue.tail));
+    EXPECT_TRUE(queue.is_empty(queue.read, queue.write));
   }
 }
 
@@ -103,17 +103,17 @@ void t(LimitQueue& queue) {
     queue.try_enqueue(new int(i));
     EXPECT_EQ(queue.size_approx(), i+1);
   }
-  EXPECT_TRUE(queue.is_full(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_full(queue.read, queue.write));
   void* m;
   EXPECT_FALSE(queue.try_enqueue(new int(100)));
   EXPECT_EQ(queue.size_approx(), 8);
-  EXPECT_TRUE(queue.is_full(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_full(queue.read, queue.write));
   for (auto i=0; i<8; i++) {
     EXPECT_TRUE(queue.try_dequeue(&m));
     EXPECT_EQ(queue.size_approx(), 7-i);
     EXPECT_EQ(*(int*)m, i);
   }
-  EXPECT_TRUE(queue.is_empty(queue.head, queue.tail));
+  EXPECT_TRUE(queue.is_empty(queue.read, queue.write));
   EXPECT_FALSE(queue.try_dequeue(&m));
   EXPECT_FALSE(queue.try_dequeue(&m));
   EXPECT_FALSE(queue.try_dequeue(&m));
@@ -142,24 +142,24 @@ TEST_F(TestFreeLockQueueInit, test_ende) {
 TEST_F(TestFreeLockQueueInit, test_rewind_ende) {
   LimitQueueTest& queue = *queue_ptr;
   uint64_t over_flow = 0xffffffffffffffff;
-  queue.head = over_flow-8;
-  queue.tail = over_flow-8;
-  queue.head_ahead = over_flow-6;
-  queue.head_missed = 2;
-  queue.tail_ahead = over_flow-7;
-  queue.tail_missed = 1;
+  queue.read = over_flow-8;
+  queue.write = over_flow-8;
+  queue.read_ahead = over_flow-6;
+  queue.read_missed = 2;
+  queue.write_ahead = over_flow-7;
+  queue.write_missed = 1;
   t(queue);
 }
 
 TEST_F(TestFreeLockQueueInit, test_rewind_ende2) {
   LimitQueueTest& queue = *queue_ptr;
   uint64_t over_flow = 0xffffffffffffffff;
-  queue.head = over_flow-64;
-  queue.tail = over_flow-64;
-  queue.head_ahead = over_flow-10;
-  queue.head_missed = 54;
-  queue.tail_ahead = over_flow-20;
-  queue.tail_missed = 44;
+  queue.read = over_flow-64;
+  queue.write = over_flow-64;
+  queue.read_ahead = over_flow-10;
+  queue.read_missed = 54;
+  queue.write_ahead = over_flow-20;
+  queue.write_missed = 44;
   t(queue);
 }
 
