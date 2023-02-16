@@ -1,37 +1,33 @@
-#include <atomic>
-#include <iostream>
-
-#include "head/schedule.h"
 #include "head/cpp3rd/metrics.h"
 #include "head/queue/lock.h"
 #include "head/queue/free_lock.h"
 #include "head/queue/task.h"
 
+#include <iostream>
 
 namespace quiet_flow{
 namespace queue{
 
 namespace task{
 
-TaskQueue::TaskQueue(uint64_t size):m_count(0) {
+TaskQueue::TaskQueue(uint64_t size):m_count(0),sleep_count(0) {
   // limit_queue = new queue::lock::LimitQueue(size);
   limit_queue = new queue::free_lock::LimitQueue(size);
   unlimit_queue = new queue::lock::UnLimitQueue(size);
-  worker_queue = new queue::free_lock::LimitQueue(1024);
 }
 
 void TaskQueue::signal() {
-  int32_t old_count = m_count.fetch_add(1, std::memory_order_release);
+  int32_t old_count = m_count.fetch_sub(1, std::memory_order_release);
 
-  bool to_release = old_count >= 0; // 说明自旋无法消化
-  void* item = nullptr;
-  if (to_release && (worker_queue->try_dequeue(&item))) {
-    ((ExectorItem*)item)->signal();
+  bool to_release = old_count <= 0; // 说明自旋无法消化
+  if (to_release && (sleep_count.load(std::memory_order_release) > 0)) {
+    std::unique_lock<std::mutex> lock(mutex_); // 理论上来说，不加锁会有小 bug
+    cond_.notify_one();
   }
 }
 
 bool TaskQueue::try_get(void** item) {
-  m_count.fetch_sub(1, std::memory_order_release);
+  m_count.fetch_add(1, std::memory_order_release);
 
   int spin = 30;
   while (--spin >= 0) {
@@ -39,17 +35,18 @@ bool TaskQueue::try_get(void** item) {
       return true;
     }
   }
-  m_count.fetch_add(1, std::memory_order_release);
+  m_count.fetch_sub(1, std::memory_order_release);
   return false;
 }
 
 void TaskQueue::wait() {
-  if (m_count.load(std::memory_order_release) > 0) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (m_count.load(std::memory_order_release) < 0) {
     return;
   }
-  auto exec = Schedule::get_cur_exec();
-  worker_queue->try_enqueue(exec);
-  exec->wait();
+  sleep_count.fetch_add(1, std::memory_order_release);
+  cond_.wait(lock);
+  sleep_count.fetch_sub(1, std::memory_order_release);
 }
 
 bool TaskQueue::enqueue(void* item) {
