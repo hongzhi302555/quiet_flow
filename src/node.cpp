@@ -164,21 +164,21 @@ class NodeRunWaiter: public Node {
 void Node::block_thread_for_group(Graph* sub_graph) {
     if (Schedule::safe_get_cur_exec()) {
         quiet_flow::ScheduleAspect::wait_graph(sub_graph);
+        return;
     }
 
     // 会阻塞当前线程, 慎用
     std::vector<Node*> required_nodes;
     sub_graph->get_nodes(required_nodes);
+    if (required_nodes.empty()) {
+        return;
+    }
 
-    Graph* g = new Graph(nullptr);
+    Graph g(nullptr);
     NodeRunWaiter* waiter = new NodeRunWaiter();
-    g->create_edges(waiter, required_nodes); // 插入任务
+    g.create_edges(waiter, required_nodes); // 插入任务
 
     sem_wait(&waiter->sem);
-
-    g->clear_graph();
-    delete g;
-    g = nullptr;
 }
 
 std::string Node::node_debug_name(std::string postfix) const {
