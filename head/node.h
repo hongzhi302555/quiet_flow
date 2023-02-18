@@ -39,7 +39,7 @@ class Graph {
     void ready(Node* node);
     Node* finish(std::vector<Node*>& notified_nodes);
   public:
-    static const uint64_t fast_node_max_num;
+    static const char fast_node_max_num;
   private:
     uint64_t idx;
     std::mutex mutex_;
@@ -49,6 +49,7 @@ class Graph {
     std::vector<std::shared_ptr<Node>> fast_nodes;
   private:
     bool limit_graph;
+    RunningStatus status;
     SelfQueue* self_queue;
 };
 
@@ -75,15 +76,18 @@ class Node {
     void resume();
     virtual void run() = 0;
     Node* finish();
+    Node* finish2(std::vector<Node*>& notified_nodes);
     void set_status(RunningStatus);
     RunningStatus loose_get_status() const {return status;}
     inline bool is_ghost() {return ghost_;}   // ghost 节点，qf 执行完自动回收
+    inline bool is_reuse() {return reuse_;}   // 节点是否复用
 
   /* -------------- 子类使用的接口 -----------*/
   protected: 
     std::mutex mutex_;
     RunningStatus status;
     bool ghost_ = false;
+    bool reuse_ = false;
   public:
     Graph* get_graph();
 
@@ -113,7 +117,7 @@ class Node {
 
 
 class RootNode: public Node {
-public:
+  public:
     RootNode() {
       root_node = this;
       ghost_ = true;
@@ -122,6 +126,23 @@ public:
       #endif
     }
     virtual ~RootNode() = default;
+};
+
+class ReuseNode: public Node {
+  protected:
+    struct NodeDelete;
+    struct Pool;
+  protected:
+    ReuseNode() { reuse_ = true; }
+    ~ReuseNode() {
+      #ifdef QUIET_FLOW_DEBUG
+      std::cout << "ReuseNode delete" << std::endl;
+      #endif
+    }
+    static Pool* init_pool(int size);
+    static ReuseNode* get_from_pool(Pool* pool);
+  public:
+    virtual Pool* get_pool() = 0;
 };
 
 }

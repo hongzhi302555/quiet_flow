@@ -122,10 +122,11 @@ Node* Graph::finish(std::vector<Node*>& notified_nodes) {
     return temp_node;
 }
 
-const uint64_t Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
+const char Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
 Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){
     limit_graph = false;
+    status = RunningStatus::Initing;
 }
 
 Graph::Graph(Node* p, size_t parallel, size_t queue_size):idx(0), parent_node(p), node_num(0) {
@@ -133,6 +134,7 @@ Graph::Graph(Node* p, size_t parallel, size_t queue_size):idx(0), parent_node(p)
         limit_graph = true;
         self_queue = new SelfQueue(parallel, queue_size);
     }
+    status = RunningStatus::Initing;
 }
 
 Graph::~Graph() {
@@ -140,13 +142,22 @@ Graph::~Graph() {
     if (limit_graph) {
         delete self_queue;
     }
+    status = RunningStatus::Destroy;
 }
 
 void Graph::clear_graph(){
     if (FLAGS_enable_qf_dump_graph) {
         return;
     }
-
+    if (status == RunningStatus::Initing) {
+        return;
+    }
+    if (status == RunningStatus::Finish) {
+        nodes.clear();
+        fast_nodes.clear();
+        return;
+    }
+    
     std::vector<Node*> required_nodes;
     get_nodes(required_nodes);
 
@@ -155,6 +166,7 @@ void Graph::clear_graph(){
         ScheduleAspect::require_node(required_nodes);
     }
 
+    status = RunningStatus::Finish;
     for (auto i: required_nodes) {
         int cnt = 0;
         while (i->status != RunningStatus::Recoverable) {
@@ -175,6 +187,8 @@ void Graph::clear_graph(){
 }
 
 void Graph::get_nodes(std::vector<Node*>& required_nodes) {
+    required_nodes.reserve(nodes.size() + fast_node_max_num);
+
     mutex_.lock();
     for (auto& n_: fast_nodes) {
         if (n_) {
@@ -198,10 +212,31 @@ Node* Graph::get_node(uint64_t idx) {
     }
 }
 
+struct ReuseNode::NodeDelete {
+    NodeDelete(queue::free_lock::LimitQueue& limit_queue_): limit_queue(limit_queue_){}
+    queue::free_lock::LimitQueue& limit_queue;
+    void operator()(Node *o) {
+        o->release();
+        if (limit_queue.try_enqueue(o)) {
+            o->pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
+        } else {
+            delete o;
+        }
+    }
+};
+
+struct ReuseNode::Pool {
+    queue::free_lock::LimitQueue limit_queue;
+    ReuseNode::NodeDelete node_delete;
+    Pool(size_t size): limit_queue(size), node_delete(limit_queue) {}
+};
+
 std::shared_ptr<Node> Graph::create_edges(Node* new_node, const std::vector<Node*>& required_nodes) {
-    std::shared_ptr<Node> shared_node;
-    shared_node.reset(new_node);
-    return create_edges(shared_node, required_nodes);
+    if (not new_node->is_reuse()) {
+        return create_edges(std::shared_ptr<Node>(new_node), required_nodes);
+    }
+    auto* reuse_node = (ReuseNode*)new_node;
+    return create_edges(std::shared_ptr<Node>(new_node, reuse_node->get_pool()->node_delete), required_nodes);
 }
 
 std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, const std::vector<Node*>& required_nodes) {
@@ -211,6 +246,7 @@ std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, con
     }
     {
         mutex_.lock();
+        status = RunningStatus::Running;
         new_node->set_parent_graph(this, node_num);
         if (node_num == 0) {
             fast_nodes.resize(fast_node_max_num);
@@ -246,14 +282,31 @@ std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, con
     return shared_node;
 }
 
-class LambdaNode: public Node {
-public:
+ReuseNode::Pool* ReuseNode::init_pool(int size) {
+    return new ReuseNode::Pool(size);
+}
+
+ReuseNode* ReuseNode::get_from_pool(ReuseNode::Pool* pool) {
+    ReuseNode* node = nullptr;
+    if (pool->limit_queue.try_dequeue((void**)&node)) {
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << "LambdaNode reuse" << std::endl;
+        #endif 
+        node->create();
+        node->pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
+    }
+    return node;
+}
+
+class LambdaNode: public ReuseNode {
+  private:
     LambdaNode(std::function<void(Graph*)> &&callable, std::string debug_name="")
     : lambda_holder([sub_graph=this->get_graph(), callable=std::move(callable)]() {
         callable(sub_graph);
     }) {
       #ifdef QUIET_FLOW_DEBUG
       name_for_debug = debug_name;
+      std::cout << "LambdaNode create" << std::endl;
       #endif
     }
     ~LambdaNode() {
@@ -261,56 +314,39 @@ public:
       std::cout << "LambdaNode delete" << std::endl;
       #endif
     }
+  private:
+    static ReuseNode::Pool* pool;
+  public:
+    static ReuseNode* New(std::function<void(Graph*)> &&callable, std::string debug_name) {
+        auto node = (LambdaNode*)(get_from_pool(pool));
+        if (node) {
+            #ifdef QUIET_FLOW_DEBUG
+            node->name_for_debug = debug_name;
+            #endif
+            node->lambda_holder = [sub_graph=node->get_graph(), callable=std::move(callable)]() {callable(sub_graph);};
+        } else {
+            node = new LambdaNode(std::move(callable), debug_name);
+        }
+        return node;
+    }
 
-protected:
+  protected:
     virtual void run(){
       lambda_holder();
       ScheduleAspect::wait_graph(this->get_graph());
     }
-
+    virtual Pool* get_pool() override {
+      return pool;
+    };
 public:
     std::function<void()> lambda_holder;
-
-public:
-    struct NodeDelete {
-        NodeDelete(queue::free_lock::LimitQueue& limit_queue_): limit_queue(limit_queue_){}
-        queue::free_lock::LimitQueue& limit_queue;
-        void operator()(LambdaNode *o) {
-            o->release();
-            if (limit_queue.try_enqueue(o)) {
-                o->pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
-            } else {
-                delete o;
-            }
-        }
-    };
-    struct Pool {
-        queue::free_lock::LimitQueue limit_queue;
-        NodeDelete node_delete;
-        Pool(size_t size): limit_queue(size), node_delete(limit_queue) {}
-    };
 };
 
-
+ReuseNode::Pool* LambdaNode::pool = ReuseNode::init_pool(1<<14);
 
 std::shared_ptr<Node> Graph::create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name) {
-    static LambdaNode::Pool pool(1<<14);
-
-    LambdaNode* node = nullptr;
-    if (pool.limit_queue.try_dequeue((void**)&node)) {
-        node->create();
-        node->pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
-        #ifdef QUIET_FLOW_DEBUG
-        node->name_for_debug = debug_name;
-        #endif
-        node->lambda_holder = [sub_graph=node->get_graph(), callable=std::move(callable)]() {callable(sub_graph);};
-    } else {
-        node = new quiet_flow::LambdaNode(std::move(callable), debug_name);
-    }
-    return create_edges(std::shared_ptr<Node>(node, pool.node_delete), required_nodes);
-
-    // node = new quiet_flow::LambdaNode(std::move(callable), debug_name);
-    // return create_edges(node, required_nodes);
+    ReuseNode* node = LambdaNode::New(std::move(callable), debug_name);
+    return create_edges(std::shared_ptr<Node>(node, node->get_pool()->node_delete), required_nodes);
 }
 
 void Node::set_status(RunningStatus s) {

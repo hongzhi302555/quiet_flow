@@ -65,12 +65,23 @@ void Node::release() {
         delete sub_graph;
         sub_graph = nullptr;
     }
-    set_status(RunningStatus::Destroy);
 }
 
 Node::~Node() {
+    int cnt = 0;
+    while (status < RunningStatus::Recoverable) {
+        cnt ++;
+        #ifdef QUIET_FLOW_DEBUG
+        std::cout << (unsigned long int)i << "\n";
+        #else
+        if ((cnt % 8) == 0) {
+            usleep(1);
+        }
+        #endif
+    }
     pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
     release();
+    set_status(RunningStatus::Destroy);
 }
 
 Graph* Node::get_graph() {
@@ -134,7 +145,10 @@ Node* Node::finish() {
             notified_nodes.push_back(d);
         }
     }
+    return finish2(notified_nodes);
+}
 
+Node* Node::finish2(std::vector<Node*>& notified_nodes) {
     mutex_.lock();
     for (auto d: down_streams) {
         if (1 == d->sub_wait_count()) {
@@ -161,8 +175,16 @@ class NodeRunWaiter: public Node {
 };
 
 void Node::block_thread_for_group(Graph* sub_graph) {
+    if (sub_graph->status == RunningStatus::Finish) {
+        return;
+    }
+    if (sub_graph->status == RunningStatus::Initing) {
+        return;
+    }
+
     if (Schedule::safe_get_cur_exec()) {
         quiet_flow::ScheduleAspect::wait_graph(sub_graph);
+        sub_graph->status = RunningStatus::Finish;
         return;
     }
 
@@ -170,6 +192,7 @@ void Node::block_thread_for_group(Graph* sub_graph) {
     std::vector<Node*> required_nodes;
     sub_graph->get_nodes(required_nodes);
     if (required_nodes.empty()) {
+        sub_graph->status = RunningStatus::Finish;
         return;
     }
 
@@ -177,6 +200,8 @@ void Node::block_thread_for_group(Graph* sub_graph) {
     NodeRunWaiter* waiter = new NodeRunWaiter();
     g.create_edges(waiter, required_nodes); // 插入任务
     waiter->sema.wait();
+    g.status = RunningStatus::Finish;
+    sub_graph->status = RunningStatus::Finish;
 }
 
 std::string Node::node_debug_name(std::string postfix) const {

@@ -23,8 +23,8 @@ enum class RunningStatus{
     Yield,
     Finish,
     Fail,
-    Destroy,
     Recoverable,
+    Destroy,
 };
 
 class LogMessageFatal {

@@ -11,8 +11,8 @@ namespace queue{
 namespace task{
 
 TaskQueue::TaskQueue(uint64_t size):m_count(0),sleep_count(0) {
-  // limit_queue = new queue::lock::LimitQueue(size);
-  limit_queue = new queue::free_lock::LimitQueue(size);
+  limit_queue = new queue::lock::LimitQueue(size);
+  // limit_queue = new queue::free_lock::LimitQueue(size);
   unlimit_queue = new queue::lock::UnLimitQueue(size);
 }
 

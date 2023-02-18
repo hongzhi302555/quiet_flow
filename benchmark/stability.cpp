@@ -116,6 +116,12 @@ class NodeM: public Node {
 
         sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get(), node_1.get()});
 
+        sub_graph->create_edges([](Graph* sub_graph){
+          std::cout << "lambda start\n";
+          usleep(1);
+          std::cout << "lambda end\n"; 
+        }, {});
+
         // do somethings
 
         ScheduleAspect::require_node({node_1.get(), node_3.get()}, name_for_debug + "aaa");                      // 等待任务执行完
