@@ -20,6 +20,7 @@ class BackNode: public Node {
     Node* back_task;
     std::shared_ptr<ExecutorContext> back_run_context_ptr;
     const std::vector<Node*>* wait_nodes_ptr = nullptr; // 串起 node 为了 debug 使用
+    const Graph* wait_graph_ptr = nullptr; // 串起 node 为了 debug 使用
   public:
     BackNode(const std::string& debug_name="") {
         self_status = RunningStatus::Initing;
@@ -118,51 +119,90 @@ void ScheduleAspect::Assistant::require_node(const std::vector<Node*>& nodes, co
 
     auto* current_exec = Schedule::get_cur_exec();
     Node* current_task = current_exec->get_current_task();
-    if (need_wait) {
-        QuietFlowAssert(!check_circle(current_task, nodes));
-
-        auto back_node = new BackNode(sub_node_debug_name);
-        Node::append_upstreams(current_task, back_node);
-
-        auto thread_exec = current_exec->get_thread_exec();
-        back_node->back_task = current_task;
-        back_node->back_run_context_ptr = thread_exec->context_ptr;
-        getcontext(back_node->back_run_context_ptr->get_coroutine_context());
-
-        Graph* sub_graph_ = current_task->get_graph();
-        if (back_node->self_status == RunningStatus::Initing) {
-            back_node->self_status = RunningStatus::Ready;
-
-            sub_graph_->create_edges(back_node, nodes);
-            back_node->wait_nodes_ptr = &nodes;
-
-            current_task->set_status(RunningStatus::Yield); 
-            current_task->require_sub_graph = true;
-            std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
-            Schedule::idle_worker_add();
-            thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
-
-            #ifdef QUIET_FLOW_DEBUG
-            current_task->name_for_debug += "#";
-            current_task->name_for_debug += std::to_string(ExectorItem::thread_idx_);
-            current_task->name_for_debug += "#";
-            #endif
-        }
-        back_node->back_run_context_ptr = nullptr;
-
-        Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr = nullptr;
-        current_task->set_status(RunningStatus::Running); 
-    } else {
+    if (not need_wait) {
         for (auto& node: nodes) {
             Node::append_upstreams(current_task, node);
         }
+        return;
     }
+
+    QuietFlowAssert(!check_circle(current_task, nodes));
+
+    auto back_node = new BackNode(sub_node_debug_name);
+    Node::append_upstreams(current_task, back_node);
+
+    Graph sub_graph_(nullptr);
+    auto thread_exec = current_exec->get_thread_exec();
+    back_node->back_task = current_task;
+    back_node->back_run_context_ptr = thread_exec->context_ptr;
+    getcontext(back_node->back_run_context_ptr->get_coroutine_context());
+    if (back_node->self_status == RunningStatus::Initing) {
+        back_node->self_status = RunningStatus::Ready;
+
+        sub_graph_.create_edges(back_node, nodes);
+        back_node->wait_nodes_ptr = &nodes;
+
+        current_task->set_status(RunningStatus::Yield); 
+        current_task->require_sub_graph = true;
+        std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
+        Schedule::idle_worker_add();
+        thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
+
+        #ifdef QUIET_FLOW_DEBUG
+        current_task->name_for_debug += "#";
+        current_task->name_for_debug += std::to_string(ExectorItem::thread_idx_);
+        current_task->name_for_debug += "#";
+        #endif
+    }
+    back_node->back_run_context_ptr = nullptr;
+
+    Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr = nullptr;
+    current_task->set_status(RunningStatus::Running); 
 }
 
 void ScheduleAspect::Assistant::wait_graph(Graph* graph, const std::string& sub_node_debug_name)const {
-    std::vector<Node*> required_nodes;
-    graph->get_nodes(required_nodes);
-    require_node(required_nodes, sub_node_debug_name);
+    QuietFlowAssert(Schedule::safe_get_cur_exec() != nullptr);
+
+    auto* current_exec = Schedule::get_cur_exec();
+    Node* current_task = current_exec->get_current_task();
+
+    if (graph->get_wait_count() == 0) {
+        return;
+    }
+
+    QuietFlowAssert(current_task->parent_graph != graph);
+
+    auto back_node = new BackNode(sub_node_debug_name);
+    Node::append_upstreams(current_task, back_node);
+
+    Graph sub_graph_(nullptr);
+    auto thread_exec = current_exec->get_thread_exec();
+    back_node->back_task = current_task;
+    back_node->back_run_context_ptr = thread_exec->context_ptr;
+    getcontext(back_node->back_run_context_ptr->get_coroutine_context());
+
+    if (back_node->self_status == RunningStatus::Initing) {
+        back_node->self_status = RunningStatus::Ready;
+
+        sub_graph_.create_edges(std::shared_ptr<Node>(back_node), *graph);
+        back_node->wait_graph_ptr = graph;
+
+        current_task->set_status(RunningStatus::Yield); 
+        current_task->require_sub_graph = true;
+        std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
+        Schedule::idle_worker_add();
+        thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
+
+        #ifdef QUIET_FLOW_DEBUG
+        current_task->name_for_debug += "#";
+        current_task->name_for_debug += std::to_string(ExectorItem::thread_idx_);
+        current_task->name_for_debug += "#";
+        #endif
+    }
+    back_node->back_run_context_ptr = nullptr;
+
+    Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr = nullptr;
+    current_task->set_status(RunningStatus::Running); 
 }
 
 }

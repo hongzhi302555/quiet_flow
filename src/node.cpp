@@ -188,17 +188,9 @@ void Node::block_thread_for_group(Graph* sub_graph) {
         return;
     }
 
-    // 会阻塞当前线程, 慎用
-    std::vector<Node*> required_nodes;
-    sub_graph->get_nodes(required_nodes);
-    if (required_nodes.empty()) {
-        sub_graph->status = RunningStatus::Finish;
-        return;
-    }
-
     Graph g(nullptr);
     NodeRunWaiter* waiter = new NodeRunWaiter();
-    g.create_edges(waiter, required_nodes); // 插入任务
+    g.create_edges(std::shared_ptr<Node>(waiter), *sub_graph); // 插入任务
     waiter->sema.wait();
     g.status = RunningStatus::Finish;
     sub_graph->status = RunningStatus::Finish;

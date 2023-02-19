@@ -113,10 +113,10 @@ class NodeM: public Node {
           std::cout << "lambda start\n";
           usleep(1);
           std::cout << "lambda end\n"; 
-        }, {});
+        }, {}, "lambda");
         auto node_4 = sub_graph->create_edges([](Graph* sub_graph){
           sub_graph->create_edges(new NodeDemo("xxxxx-8-", 2), {nullptr});
-        }, {});
+        }, {}, "lambdb");
 
         ScheduleAspect::require_node({node_1.get(), node_2.get()}, "wait");                 // 等待任务执行完
 

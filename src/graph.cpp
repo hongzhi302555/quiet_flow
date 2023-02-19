@@ -50,6 +50,16 @@ void Graph::ready(Node* node) {
 }
 
 Node* Graph::finish(std::vector<Node*>& notified_nodes) {
+    if (1 == wait_count.fetch_sub(1, std::memory_order_relaxed)) {
+        mutex_.lock();
+        for (auto d: down_streams) {
+            if (1 == d->sub_wait_count()) {
+                notified_nodes.push_back(d);
+            }
+        }
+        mutex_.unlock();
+    }
+
     Node* next_task = nullptr;
 
     if (!limit_graph) {
@@ -125,12 +135,12 @@ Node* Graph::finish(std::vector<Node*>& notified_nodes) {
 
 const char Graph::fast_node_max_num = 63;  // node.fast_downstrem (long int 最高位是 flag)
 
-Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0){
+Graph::Graph(Node* p):idx(0), parent_node(p), node_num(0), wait_count(0) {
     limit_graph = false;
     status = RunningStatus::Initing;
 }
 
-Graph::Graph(Node* p, size_t parallel, size_t queue_size):idx(0), parent_node(p), node_num(0) {
+Graph::Graph(Node* p, size_t parallel, size_t queue_size):idx(0), parent_node(p), node_num(0), wait_count(0) {
     if (parallel < 30 && queue_size < (1<<15)) {
         limit_graph = true;
         self_queue = new SelfQueue(parallel, queue_size);
@@ -240,7 +250,47 @@ std::shared_ptr<Node> Graph::create_edges(Node* new_node, const std::vector<Node
     return create_edges(std::shared_ptr<Node>(new_node, reuse_node->get_pool()->node_delete), required_nodes);
 }
 
+std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, Graph& g) {
+    wait_count.fetch_add(1, std::memory_order_relaxed);
+
+    Node* new_node = shared_node.get();
+    if (parent_node) {
+        new_node->root_node = parent_node->root_node;
+    }
+    {
+        mutex_.lock();
+        status = RunningStatus::Running;
+        new_node->set_parent_graph(this, node_num);
+        if (node_num == 0) {
+            fast_nodes.resize(fast_node_max_num);
+        }
+        if (node_num < fast_node_max_num) {
+            fast_nodes[new_node->node_id] = shared_node;
+        } else {
+            nodes.push_back(shared_node);
+        }
+        node_num += 1;
+        mutex_.unlock();
+    }
+
+    if (g.wait_count == 0) {
+        new_node->parent_graph->ready(new_node);
+    } else {
+        g.mutex_.lock();
+        if (g.wait_count == 0) {
+            new_node->parent_graph->ready(new_node);
+        } else {
+            new_node->add_wait_count(1);
+            g.down_streams.push_back(new_node);
+        }
+        g.mutex_.unlock();
+    }
+    return shared_node;
+}
+
 std::shared_ptr<Node> Graph::create_edges(std::shared_ptr<Node> shared_node, const std::vector<Node*>& required_nodes) {
+    wait_count.fetch_add(1, std::memory_order_relaxed);
+
     Node* new_node = shared_node.get();
     if (parent_node) {
         new_node->root_node = parent_node->root_node;
@@ -305,8 +355,8 @@ class LambdaNode: public ReuseNode {
     : lambda_holder([sub_graph=this->get_graph(), callable=std::move(callable)]() {
         callable(sub_graph);
     }) {
-      #ifdef QUIET_FLOW_DEBUG
       name_for_debug = debug_name;
+      #ifdef QUIET_FLOW_DEBUG
       std::cout << "LambdaNode create" << std::endl;
       #endif
     }
@@ -321,9 +371,7 @@ class LambdaNode: public ReuseNode {
     static ReuseNode* New(std::function<void(Graph*)> &&callable, std::string debug_name) {
         auto node = (LambdaNode*)(get_from_pool(pool));
         if (node) {
-            #ifdef QUIET_FLOW_DEBUG
             node->name_for_debug = debug_name;
-            #endif
             node->lambda_holder = [sub_graph=node->get_graph(), callable=std::move(callable)]() {callable(sub_graph);};
         } else {
             node = new LambdaNode(std::move(callable), debug_name);

@@ -29,12 +29,17 @@ class Graph {
     void clear_graph();
     void get_nodes(std::vector<Node*>& required_nodes);
     Node* get_node(uint64_t idx);
+    std::string dump(bool is_root);
+
+  public:
     std::shared_ptr<Node> create_edges(Node* new_node, const std::vector<Node*>& required_nodes);
     std::shared_ptr<Node> create_edges(std::function<void(Graph*)> &&callable, const std::vector<Node*>& required_nodes, std::string debug_name = "");
-    std::string dump(bool is_root);
   private:
     std::shared_ptr<Node> create_edges(std::shared_ptr<Node> new_node, const std::vector<Node*>& required_nodes);
+    std::shared_ptr<Node> create_edges(std::shared_ptr<Node> shared_node, Graph& g);  // 依赖 graph 很容易出环，不对外使用
+
   friend class Node;
+  friend class ScheduleAspect::Assistant;
   protected:
     void ready(Node* node);
     Node* finish(std::vector<Node*>& notified_nodes);
@@ -45,12 +50,16 @@ class Graph {
     std::mutex mutex_;
     Node* parent_node;
     uint64_t node_num;
+    std::atomic<int> wait_count;
     std::vector<std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Node>> fast_nodes;
+    std::vector<Node*> down_streams;
   private:
     bool limit_graph;
     RunningStatus status;
     SelfQueue* self_queue;
+  public:
+    inline int get_wait_count() {return wait_count;}
 };
 
 class Node {
@@ -104,8 +113,9 @@ class Node {
     static const long int fast_down_strams_bak_init;
     long int fast_down_strams;
     long int fast_down_strams_bak;
-    std::vector<Node*> down_streams;
     std::atomic<int> wait_count;
+  protected:
+    std::vector<Node*> down_streams;
   private:
     static void append_upstreams(Node*, const Node*);
     int add_wait_count(int upstream_count);
