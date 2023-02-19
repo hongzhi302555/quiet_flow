@@ -28,8 +28,9 @@ class SelfQueue {
     }
 
     bool try_dequeue(Node** node) {
-        m_count.fetch_sub(1, std::memory_order_release);
-        if (limit_queue.try_dequeue((void**)node)) {
+        int32_t old_count = m_count.fetch_sub(1, std::memory_order_release);
+        if (old_count > 0) {
+            while(!limit_queue.try_dequeue((void**)node));
             return true;
         }
         return false;
