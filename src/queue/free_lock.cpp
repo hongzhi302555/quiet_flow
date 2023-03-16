@@ -84,7 +84,7 @@ bool LimitQueue::try_dequeue(void** item) {
   return false;
 }
 
-bool  LimitQueue::try_enqueue(void* item) {
+bool LimitQueue::try_enqueue(void* item) {
   uint64_t read_ = read.load(std::memory_order_relaxed);
   uint64_t write_missed_ = write_missed.load(std::memory_order_relaxed);
   uint64_t write_ahead_ = write_ahead.load(std::memory_order_relaxed);

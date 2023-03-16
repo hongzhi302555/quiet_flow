@@ -13,14 +13,15 @@ class TaskQueue {
     AbstractQueue* limit_queue;
     AbstractQueue* unlimit_queue;
   private:
+    #ifndef QUIET_FLOW_QUICK_BUG
     std::mutex mutex_;
     std::condition_variable cond_;
+    #endif
     std::atomic<int32_t> m_count;
     std::atomic<int32_t> sleep_count;
   private:
     void signal();
     void wait();
-    bool try_wait();
     bool try_get(void** item);
 
   public:

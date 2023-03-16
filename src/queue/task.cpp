@@ -1,3 +1,7 @@
+#include <linux/futex.h> // FUTEX_*
+#include <sys/syscall.h> // __NR_futex
+#include <unistd.h>      // syscall
+
 #include "head/cpp3rd/metrics.h"
 #include "head/queue/lock.h"
 #include "head/queue/free_lock.h"
@@ -11,8 +15,8 @@ namespace queue{
 namespace task{
 
 TaskQueue::TaskQueue(uint64_t size):m_count(0),sleep_count(0) {
-  limit_queue = new queue::lock::LimitQueue(size);
-  // limit_queue = new queue::free_lock::LimitQueue(size);
+  // limit_queue = new queue::lock::LimitQueue(size);
+  limit_queue = new queue::free_lock::LimitQueue(size);
   unlimit_queue = new queue::lock::UnLimitQueue(size);
 }
 
@@ -21,8 +25,12 @@ void TaskQueue::signal() {
 
   bool to_release = old_count <= 0; // 说明自旋无法消化
   if (to_release && (sleep_count.load(std::memory_order_release) > 0)) {
+    #ifndef QUIET_FLOW_QUICK_BUG
     std::unique_lock<std::mutex> lock(mutex_); // 理论上来说，不加锁会有小 bug
     cond_.notify_one();
+    #else
+    ::syscall(__NR_futex, this, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), 1);
+    #endif
   }
 }
 
@@ -40,6 +48,7 @@ bool TaskQueue::try_get(void** item) {
 }
 
 void TaskQueue::wait() {
+  #ifndef QUIET_FLOW_QUICK_BUG
   std::unique_lock<std::mutex> lock(mutex_);
   if (m_count.load(std::memory_order_release) < 0) {
     return;
@@ -47,6 +56,12 @@ void TaskQueue::wait() {
   sleep_count.fetch_add(1, std::memory_order_release);
   cond_.wait(lock);
   sleep_count.fetch_sub(1, std::memory_order_release);
+  #else
+  sleep_count.fetch_add(1, std::memory_order_release);
+  int32_t val = 0;
+  ::syscall(__NR_futex, this, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), val, nullptr);
+  sleep_count.fetch_sub(1, std::memory_order_release);
+  #endif
 }
 
 bool TaskQueue::enqueue(void* item) {
