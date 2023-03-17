@@ -133,7 +133,7 @@ void Thread::set_context(std::shared_ptr<ExecutorContext> in_context_ptr) {
     context_ptr = in_context_ptr;
 
     in_context_ptr = nullptr;  // 这里必须要清空，不然泄漏
-    coctx_swap(context_pre_ptr->get_coroutine_context(), context_ptr->get_coroutine_context());
+    coctx_set(nullptr, context_ptr->get_coroutine_context());
 }
 
 }
