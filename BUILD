@@ -20,6 +20,7 @@ cc_library(
         "src/queue/*.cpp",
         "src/async_extension/*.cpp",
         "src/locks/thread.cpp",
+        "src/cpp3rd/libco/*",
     ],
     incs=[
         "./",

@@ -53,7 +53,7 @@ class BackNode: public Node {
 
         auto thread_exec = Schedule::get_cur_exec();
         thread_exec->set_current_task(back_task);
-        thread_exec->get_thread_exec()->s_setcontext(back_run_context_ptr);
+        thread_exec->get_thread_exec()->set_context(back_run_context_ptr);
     }
 };
 
@@ -135,7 +135,6 @@ void ScheduleAspect::Assistant::require_node(const std::vector<Node*>& nodes, co
     auto thread_exec = current_exec->get_thread_exec();
     back_node->back_task = current_task;
     back_node->back_run_context_ptr = thread_exec->context_ptr;
-    getcontext(back_node->back_run_context_ptr->get_coroutine_context());
     if (back_node->self_status == RunningStatus::Initing) {
         back_node->self_status = RunningStatus::Ready;
 
@@ -179,8 +178,6 @@ void ScheduleAspect::Assistant::wait_graph(Graph* graph, const std::string& sub_
     auto thread_exec = current_exec->get_thread_exec();
     back_node->back_task = current_task;
     back_node->back_run_context_ptr = thread_exec->context_ptr;
-    getcontext(back_node->back_run_context_ptr->get_coroutine_context());
-
     if (back_node->self_status == RunningStatus::Initing) {
         back_node->self_status = RunningStatus::Ready;
 

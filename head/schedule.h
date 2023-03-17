@@ -57,7 +57,7 @@ class Schedule {
     static void idle_worker_add();
     inline static ExectorItem* get_cur_exec() {return thread_exec_vec[ExectorItem::thread_idx_];}
     static ExectorItem* safe_get_cur_exec();
-    static void jump_in_schedule();
+    static void jump_in_schedule(void*,void*);
 
   // 与外部交, 但只有 Node/Graph 可以向 schedule 投放任务
   friend class Graph;

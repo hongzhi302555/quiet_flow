@@ -186,7 +186,7 @@ void Schedule::change_context_status() {
     }
 }
 
-void Schedule::jump_in_schedule() {
+void Schedule::jump_in_schedule(void*,void*) {
     if (inner_schedule->status == RunningStatus::Initing) {
         mutex_.lock();
         change_context_status();
@@ -198,7 +198,7 @@ void Schedule::jump_in_schedule() {
     inner_schedule->do_schedule();
 
     auto thread_exec = Schedule::get_cur_exec()->get_thread_exec();
-    thread_exec->s_setcontext(thread_exec->thread_context);
+    thread_exec->set_context(thread_exec->thread_context);
 }
 
 void Schedule::run_task(Node* task) {
@@ -286,8 +286,6 @@ void Schedule::routine(Thread* thread_exec) {
         mutex_.lock();
         ExectorItem::thread_idx_ = thread_exec_vec.size();
         thread_exec->thread_context.reset(new ExecutorContext(1));
-        getcontext(thread_exec->thread_context->get_coroutine_context());
-
         thread_exec_vec.push_back(new ExectorItem(thread_exec));
         mutex_.unlock();
     }

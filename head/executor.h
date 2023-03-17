@@ -3,7 +3,8 @@
 #include <atomic>
 #include <memory>
 #include <thread>
-#include <ucontext.h>
+
+#include "head/cpp3rd/libco/coctx.h"
 
 #include "head/queue/interface.h"
 #include "util.h"
@@ -14,7 +15,7 @@ class ExecutorContext {
     static const unsigned int COROUTINE_STACK_SIZE;
     static std::atomic<int> pending_context_num_;
   private:
-    ucontext_t context;
+    coctx_t context;
     void* stack_ptr;
     int stack_size;
     RunningStatus status;
@@ -24,7 +25,7 @@ class ExecutorContext {
     ~ExecutorContext();
     RunningStatus get_status();
     void set_status(RunningStatus);
-    ucontext_t* get_coroutine_context() {return &context;}
+    coctx_t* get_coroutine_context() {return &context;}
     void* get_stack_base() {return stack_ptr;}
     void shrink_physical_memory();
   private:
@@ -42,8 +43,8 @@ class Thread {
   public:
     ~Thread();
     Thread(void (*)(Thread*));
-    void swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void(*)(void));
-    void s_setcontext(std::shared_ptr<ExecutorContext> in_context_ptr);
+    void swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void(*)(void*,void*));
+    void set_context(std::shared_ptr<ExecutorContext> in_context_ptr);
   public:
     inline bool get_stack(void** stack) {
       return stack_pool->try_dequeue(stack);

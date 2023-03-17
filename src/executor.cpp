@@ -112,29 +112,28 @@ Thread::~Thread() {
     stack_pool = nullptr;
 }
 
-void Thread::swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void (*func)(void)) {
+void Thread::swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void (*func)(void*, void*)) {
     context_pre_ptr = out_context_ptr;
 
     auto* new_context = new ExecutorContext(ExecutorContext::COROUTINE_STACK_SIZE);
     context_ptr.reset(new_context);
 
     auto coroutine_context_ptr = new_context->get_coroutine_context();
-    getcontext(coroutine_context_ptr);
-    coroutine_context_ptr->uc_link = nullptr;
-    coroutine_context_ptr->uc_stack.ss_sp = new_context->get_stack_base();
-    coroutine_context_ptr->uc_stack.ss_size = ExecutorContext::COROUTINE_STACK_SIZE;
-    makecontext(coroutine_context_ptr, func, 0);
+    coctx_init(coroutine_context_ptr);
+    coroutine_context_ptr->ss_sp = (char*)(new_context->get_stack_base());
+    coroutine_context_ptr->ss_size = ExecutorContext::COROUTINE_STACK_SIZE;
+    coctx_make(coroutine_context_ptr, (coctx_pfn_t)func, nullptr, 0);
 
     out_context_ptr->shrink_physical_memory();
-    swapcontext(out_context_ptr->get_coroutine_context(), coroutine_context_ptr);
+    coctx_swap(out_context_ptr->get_coroutine_context(), coroutine_context_ptr);
 }
 
-void Thread::s_setcontext(std::shared_ptr<ExecutorContext> in_context_ptr) {
+void Thread::set_context(std::shared_ptr<ExecutorContext> in_context_ptr) {
     context_pre_ptr = context_ptr;
     context_ptr = in_context_ptr;
 
     in_context_ptr = nullptr;  // 这里必须要清空，不然泄漏
-    setcontext(context_ptr->get_coroutine_context());
+    coctx_swap(context_pre_ptr->get_coroutine_context(), context_ptr->get_coroutine_context());
 }
 
 }
