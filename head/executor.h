@@ -34,17 +34,17 @@ class ExecutorContext {
 
 class Thread {
   public:
-    std::shared_ptr<ExecutorContext> context_ptr;
-    std::shared_ptr<ExecutorContext> context_pre_ptr;
-    std::shared_ptr<ExecutorContext> thread_context;
+    ExecutorContext* context_ptr;
+    ExecutorContext* context_pre_ptr;
+    ExecutorContext* thread_context;
   private:
     std::thread *threador;
     queue::AbstractQueue* stack_pool;
   public:
     ~Thread();
     Thread(void (*)(Thread*));
-    void swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void(*)(void*,void*));
-    void set_context(std::shared_ptr<ExecutorContext> in_context_ptr);
+    void swap_new_context(ExecutorContext* out_context_ptr, void(*)(void*,void*));
+    void set_context(ExecutorContext* in_context_ptr);
   public:
     inline bool get_stack(void** stack) {
       return stack_pool->try_dequeue(stack);

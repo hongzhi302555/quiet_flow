@@ -26,7 +26,7 @@ static void routine(Thread* thread_exec) {
       Schedule::mutex_.lock();
       ExectorItem::thread_idx_ = Schedule::thread_exec_vec.size();
       Schedule::thread_exec_vec.push_back(new ExectorItem(thread_exec));
-      thread_exec->thread_context.reset(new ExecutorContext(1));
+      thread_exec->thread_context = new ExecutorContext(1);
       thread_exec->thread_context->set_status(RunningStatus::Yield);
       Schedule::mutex_.unlock();
   }

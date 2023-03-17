@@ -18,7 +18,7 @@ class BackNode: public Node {
   public:
     RunningStatus self_status;
     Node* back_task;
-    std::shared_ptr<ExecutorContext> back_run_context_ptr;
+    ExecutorContext* back_run_context_ptr;
     const std::vector<Node*>* wait_nodes_ptr = nullptr; // 串起 node 为了 debug 使用
     const Graph* wait_graph_ptr = nullptr; // 串起 node 为了 debug 使用
   public:
@@ -143,7 +143,6 @@ void ScheduleAspect::Assistant::require_node(const std::vector<Node*>& nodes, co
 
         current_task->set_status(RunningStatus::Yield); 
         current_task->require_sub_graph = true;
-        std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
         Schedule::idle_worker_add();
         thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
 
@@ -154,7 +153,7 @@ void ScheduleAspect::Assistant::require_node(const std::vector<Node*>& nodes, co
         #endif
     }
     back_node->back_run_context_ptr = nullptr;
-
+    delete Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr;
     Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr = nullptr;
     current_task->set_status(RunningStatus::Running); 
 }
@@ -186,7 +185,7 @@ void ScheduleAspect::Assistant::wait_graph(Graph* graph, const std::string& sub_
 
         current_task->set_status(RunningStatus::Yield); 
         current_task->require_sub_graph = true;
-        std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
+        // std::shared_ptr<ExecutorContext> ptr = back_node->back_run_context_ptr;         // 这里不要删！！！
         Schedule::idle_worker_add();
         thread_exec->swap_new_context(back_node->back_run_context_ptr, Schedule::jump_in_schedule);
 
@@ -197,7 +196,7 @@ void ScheduleAspect::Assistant::wait_graph(Graph* graph, const std::string& sub_
         #endif
     }
     back_node->back_run_context_ptr = nullptr;
-
+    delete Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr;
     Schedule::get_cur_exec()->get_thread_exec()->context_pre_ptr = nullptr;
     current_task->set_status(RunningStatus::Running); 
 }

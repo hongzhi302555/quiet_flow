@@ -71,13 +71,9 @@ Node::~Node() {
     int cnt = 0;
     while (status < RunningStatus::Recoverable) {
         cnt ++;
-        #ifdef QUIET_FLOW_DEBUG
-        std::cout << (unsigned long int)i << "\n";
-        #else
         if ((cnt % 8) == 0) {
             usleep(1);
         }
-        #endif
     }
     pending_worker_num_.fetch_sub(1, std::memory_order_relaxed);
     release();

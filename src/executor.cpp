@@ -96,9 +96,13 @@ Thread::Thread(void (*func)(Thread*)) {
 
 Thread::~Thread() {
     threador->join();
+    if (context_ptr) delete context_ptr;
+    if (context_pre_ptr) delete context_pre_ptr;
+
     context_ptr = nullptr;
     context_pre_ptr = nullptr;
     thread_context = nullptr;
+
     delete threador;
     threador = nullptr;
 
@@ -112,15 +116,13 @@ Thread::~Thread() {
     stack_pool = nullptr;
 }
 
-void Thread::swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, void (*func)(void*, void*)) {
+void Thread::swap_new_context(ExecutorContext* out_context_ptr, void (*func)(void*, void*)) {
     context_pre_ptr = out_context_ptr;
+    context_ptr = new ExecutorContext(ExecutorContext::COROUTINE_STACK_SIZE);
 
-    auto* new_context = new ExecutorContext(ExecutorContext::COROUTINE_STACK_SIZE);
-    context_ptr.reset(new_context);
-
-    auto coroutine_context_ptr = new_context->get_coroutine_context();
+    auto coroutine_context_ptr = context_ptr->get_coroutine_context();
     coctx_init(coroutine_context_ptr);
-    coroutine_context_ptr->ss_sp = (char*)(new_context->get_stack_base());
+    coroutine_context_ptr->ss_sp = (char*)(context_ptr->get_stack_base());
     coroutine_context_ptr->ss_size = ExecutorContext::COROUTINE_STACK_SIZE;
     coctx_make(coroutine_context_ptr, (coctx_pfn_t)func, nullptr, 0);
 
@@ -128,7 +130,7 @@ void Thread::swap_new_context(std::shared_ptr<ExecutorContext> out_context_ptr, 
     coctx_swap(out_context_ptr->get_coroutine_context(), coroutine_context_ptr);
 }
 
-void Thread::set_context(std::shared_ptr<ExecutorContext> in_context_ptr) {
+void Thread::set_context(ExecutorContext* in_context_ptr) {
     context_pre_ptr = context_ptr;
     context_ptr = in_context_ptr;
 

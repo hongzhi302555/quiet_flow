@@ -29,7 +29,7 @@ void mock_run_thread(Node* task) {
   auto thread_exec = new Thread(routine);
   auto item = new ExectorItem(thread_exec);
   Schedule::thread_exec_vec.push_back(item);
-  thread_exec->context_ptr.reset(new ExecutorContext(1));
+  thread_exec->context_ptr = new ExecutorContext(1);
   item->set_current_task(task);
 }
 

@@ -285,7 +285,7 @@ void Schedule::routine(Thread* thread_exec) {
     {
         mutex_.lock();
         ExectorItem::thread_idx_ = thread_exec_vec.size();
-        thread_exec->thread_context.reset(new ExecutorContext(1));
+        thread_exec->thread_context = new ExecutorContext(1);
         thread_exec_vec.push_back(new ExectorItem(thread_exec));
         mutex_.unlock();
     }
@@ -295,6 +295,5 @@ void Schedule::routine(Thread* thread_exec) {
 
     thread_exec->thread_context->set_status(RunningStatus::Ready);
     thread_exec->swap_new_context(thread_exec->thread_context, Schedule::jump_in_schedule);
-    thread_exec->context_pre_ptr = nullptr;
 }
 }
