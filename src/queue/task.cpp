@@ -29,11 +29,13 @@ void TaskQueue::signal() {
     std::unique_lock<std::mutex> lock(mutex_); // 理论上来说，不加锁会有小 bug
     cond_.notify_one();
     #else
-    ::syscall(__NR_futex, this, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), 1);
+    ::syscall(SYS_futex, &m_count, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), 1);
+    #ifdef QUIET_FLOW_DEBUG
+    std::cout << "ccccccc signal" << std::endl;
+    #endif
     #endif
   }
 }
-
 bool TaskQueue::try_get(void** item) {
   m_count.fetch_add(1, std::memory_order_release);
 
@@ -58,8 +60,10 @@ void TaskQueue::wait() {
   sleep_count.fetch_sub(1, std::memory_order_release);
   #else
   sleep_count.fetch_add(1, std::memory_order_release);
-  int32_t val = 0;
-  ::syscall(__NR_futex, this, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), val, nullptr);
+  ::syscall(SYS_futex, &m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), 0, nullptr);
+  #ifdef QUIET_FLOW_DEBUG
+  std::cout << "ccccccc wait" << std::endl;
+  #endif
   sleep_count.fetch_sub(1, std::memory_order_release);
   #endif
 }
@@ -83,6 +87,10 @@ void TaskQueue::wait_dequeue(void** item) {
   wait(); // 虚假唤醒
 
   while (!inner_dequeue(item)) {
+    #ifdef QUIET_FLOW_DEBUG
+    std::cout << "task_queue fake_wakeup" << std::endl;
+    #endif
+    quiet_flow::Metrics::emit_counter("task_queue.fake_wakeup", 1);
     if (try_get(item)) {
       return;
     }
