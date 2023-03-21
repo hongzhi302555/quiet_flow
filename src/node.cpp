@@ -180,7 +180,6 @@ void Node::block_thread_for_group(Graph* sub_graph) {
 
     if (Schedule::safe_get_cur_exec()) {
         quiet_flow::ScheduleAspect::wait_graph(sub_graph);
-        sub_graph->status = RunningStatus::Finish;
         return;
     }
 
@@ -189,7 +188,6 @@ void Node::block_thread_for_group(Graph* sub_graph) {
     g.create_edges(std::shared_ptr<Node>(waiter), *sub_graph); // 插入任务
     waiter->sema.wait();
     g.status = RunningStatus::Finish;
-    sub_graph->status = RunningStatus::Finish;
 }
 
 std::string Node::node_debug_name(std::string postfix) const {
