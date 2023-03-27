@@ -59,8 +59,12 @@ void TaskQueue::wait() {
   cond_.wait(lock);
   sleep_count.fetch_sub(1, std::memory_order_release);
   #else
+  auto cur_count = m_count.load(std::memory_order_release);
+  if (cur_count < 0) {
+    return;
+  }
   sleep_count.fetch_add(1, std::memory_order_release);
-  ::syscall(SYS_futex, &m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), 0, nullptr);
+  ::syscall(SYS_futex, &m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), cur_count, nullptr);
   #ifdef QUIET_FLOW_DEBUG
   std::cout << "ccccccc wait" << std::endl;
   #endif
