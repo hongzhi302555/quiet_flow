@@ -31,7 +31,7 @@ class BackNode: public Node {
     ~BackNode() {
         #ifdef QUIET_FLOW_DEBUG
         name_for_debug = "free_@" + name_for_debug;
-        std::cout << name_for_debug << std::endl;
+        StdOut() << name_for_debug;
         #endif
     }
     void run() {
@@ -48,7 +48,7 @@ class BackNode: public Node {
         back_run_context_ptr->set_status(RunningStatus::Running);
 
         #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
+        StdOut() << name_for_debug;
         #endif
 
         auto thread_exec = Schedule::get_cur_exec();

@@ -55,9 +55,9 @@ class FutureRPC {
         folly::Future<int> future = promise.getFuture();
 
         std::thread thread([ret, promise = std::move(promise)] () mutable {
-            std::cout << "feture start\n";
+            StdOut() << "feture start\n";
             usleep(1);
-            std::cout << "feture end\n";
+            StdOut() << "feture end\n";
             finish_task.fetch_add(1, std::memory_order_relaxed);
             promise.setValue(ret);
         }); 

@@ -1,4 +1,5 @@
 #include "head/util.h"
+#include <iostream>
 
 namespace quiet_flow{
 void bit_map_idx(const long int bit_map, uint64_t bit_size, std::vector<uint64_t>& idx_vec) {
@@ -38,6 +39,11 @@ bool bit_map_get(const long int bit_map, uint64_t bit, uint64_t bit_size) {
 uint64_t align_size(uint64_t size) {
     auto first_bit = std::__lg(size);
     return ((1<<first_bit) == size) ? size : (1<<(first_bit+1));
+}
+
+StdOut::~StdOut() {
+    oss << "\n";
+    std::cout << oss.str() << std::endl;
 }
 
 }

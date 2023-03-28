@@ -22,7 +22,7 @@ class InnerEndNode: public Node {
     }
     void run() {
         #ifdef QUIET_FLOW_DEBUG
-        std::cout << name_for_debug << std::endl;
+        StdOut() << name_for_debug;
         #endif
     }
 };

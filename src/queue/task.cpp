@@ -3,6 +3,7 @@
 #include <unistd.h>      // syscall
 
 #include "head/cpp3rd/metrics.h"
+#include "head/schedule.h"
 #include "head/queue/lock.h"
 #include "head/queue/free_lock.h"
 #include "head/queue/task.h"
@@ -23,15 +24,18 @@ TaskQueue::TaskQueue(uint64_t size):m_count(0),sleep_count(0) {
 void TaskQueue::signal() {
   int32_t old_count = m_count.fetch_sub(1, std::memory_order_release);
 
-  bool to_release = old_count <= 0; // 说明自旋无法消化
+  bool to_release = (old_count <= 0); // 说明自旋无法消化
   if (to_release && (sleep_count.load(std::memory_order_release) > 0)) {
+    #ifdef QUIET_FLOW_DEBUG
+    StdOut() << ExectorItem::thread_idx_ << " task_queue signal:" << sleep_count << "VS" << old_count;
+    #endif
     #ifndef QUIET_FLOW_QUICK_BUG
     std::unique_lock<std::mutex> lock(mutex_); // 理论上来说，不加锁会有小 bug
     cond_.notify_one();
     #else
     ::syscall(SYS_futex, &m_count, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), 1);
     #ifdef QUIET_FLOW_DEBUG
-    std::cout << "ccccccc signal" << std::endl;
+    StdOut() << "ccccccc signal";
     #endif
     #endif
   }
@@ -61,12 +65,18 @@ void TaskQueue::wait() {
   #else
   auto cur_count = m_count.load(std::memory_order_release);
   if (cur_count < 0) {
+    #ifdef QUIET_FLOW_DEBUG
+    StdOut() << ExectorItem::thread_idx_ << "task_queue wait_1:" << sleep_count << "VS" << m_count << "OLD" << cur_count;
+    #endif
     return;
   }
   sleep_count.fetch_add(1, std::memory_order_release);
   ::syscall(SYS_futex, &m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), cur_count, nullptr);
   #ifdef QUIET_FLOW_DEBUG
-  std::cout << "ccccccc wait" << std::endl;
+  StdOut() << ExectorItem::thread_idx_ << "task_queue wait_2:"  << sleep_count << "VS" << m_count << "OLD" << cur_count;
+  #endif
+  #ifdef QUIET_FLOW_DEBUG
+  StdOut() << "ccccccc wait";
   #endif
   sleep_count.fetch_sub(1, std::memory_order_release);
   #endif
@@ -92,7 +102,7 @@ void TaskQueue::wait_dequeue(void** item) {
 
   while (!inner_dequeue(item)) {
     #ifdef QUIET_FLOW_DEBUG
-    std::cout << "task_queue fake_wakeup" << std::endl;
+    StdOut() << ExectorItem::thread_idx_ << " task_queue fake_wakeup:" << sleep_count << "VS" << m_count;
     #endif
     quiet_flow::Metrics::emit_counter("task_queue.fake_wakeup", 1);
     if (try_get(item)) {

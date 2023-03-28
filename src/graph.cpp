@@ -183,7 +183,7 @@ void Graph::clear_graph(){
         while (i->status != RunningStatus::Recoverable) {
             cnt ++;
             #ifdef QUIET_FLOW_DEBUG
-            std::cout << (unsigned long int)i << "\n";
+            StdOut() << (unsigned long int)i << "\n";
             #else
             if ((cnt % 8) == 0) {
                 usleep(1);
@@ -341,7 +341,7 @@ ReuseNode* ReuseNode::get_from_pool(ReuseNode::Pool* pool) {
     ReuseNode* node = nullptr;
     if (pool->limit_queue.try_dequeue((void**)&node)) {
         #ifdef QUIET_FLOW_DEBUG
-        std::cout << "LambdaNode reuse" << std::endl;
+        StdOut() << "LambdaNode reuse";
         #endif 
         node->create();
         node->pending_worker_num_.fetch_add(1, std::memory_order_relaxed);
@@ -357,12 +357,12 @@ class LambdaNode: public ReuseNode {
     }) {
       name_for_debug = debug_name;
       #ifdef QUIET_FLOW_DEBUG
-      std::cout << "LambdaNode create" << std::endl;
+      StdOut() << "LambdaNode create";
       #endif
     }
     ~LambdaNode() {
       #ifdef QUIET_FLOW_DEBUG
-      std::cout << "LambdaNode delete" << std::endl;
+      StdOut() << "LambdaNode delete";
       #endif
     }
   private:

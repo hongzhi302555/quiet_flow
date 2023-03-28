@@ -53,4 +53,24 @@ void bit_map_set(long int& bit_map, uint64_t bit, uint64_t bit_size);
 bool bit_map_get(const long int bit_map, uint64_t bit, uint64_t bit_size);
 
 uint64_t align_size(uint64_t size);
+
+class StdOut {
+  private:
+    std::ostringstream oss;
+  public:
+    StdOut() = default;
+    ~StdOut();
+  public:
+    template<class T>
+    StdOut& operator<<(T &v){
+        oss << " " << v;
+        return *this;
+    }
+    StdOut& operator<<(unsigned long i){
+        oss << i;
+        return *this;
+    }
+    
+};
+
 }

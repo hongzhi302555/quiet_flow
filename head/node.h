@@ -146,7 +146,7 @@ class ReuseNode: public Node {
     ReuseNode() { reuse_ = true; }
     ~ReuseNode() {
       #ifdef QUIET_FLOW_DEBUG
-      std::cout << "ReuseNode delete" << std::endl;
+      std::cout << "ReuseNode delete";
       #endif
     }
     static Pool* init_pool(int size);

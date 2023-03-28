@@ -35,15 +35,11 @@ class NodeDemo: public Node {
         sleep_time = s;
     }
     void run() {
-        std::ostringstream oss;
-        oss << name_for_debug << " before sleep" << "\n";
-        std::cout << oss.str();
+        StdOut() << name_for_debug << " before sleep" << "\n";
 
         usleep(sleep_time);
 
-        std::ostringstream oss2;
-        oss2 << name_for_debug << " after sleep" << "\n";
-        std::cout << oss2.str();
+        StdOut() << name_for_debug << " after sleep" << "\n";
 
         finish_task.fetch_add(1, std::memory_order_relaxed);
     }
@@ -57,9 +53,9 @@ class FutureRPC {
         folly::Future<int> future = promise.getFuture();
 
         std::thread thread([ret, promise = std::move(promise)] () mutable {
-            std::cout << "feture start\n";
+            StdOut() << "feture start\n";
             usleep(1);
-            std::cout << "feture end\n";
+            StdOut() << "feture end\n";
             finish_task.fetch_add(1, std::memory_order_relaxed);
             promise.setValue(ret);
         }); 
@@ -80,18 +76,14 @@ class NodeDemo2: public FollyFutureAspect {
         sleep_time = s;
     }
     void process(std::string post) {
-        std::ostringstream oss;
-        oss << name_for_debug << " before pemeate sleep" << "\n";
-        std::cout << oss.str();
+        StdOut() << name_for_debug << " before pemeate sleep" << "\n";
 
         usleep(sleep_time);
 
         int r_t;
         FollyFutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
 
-        std::ostringstream oss2;
-        oss2 << name_for_debug << " after pemeate sleep" << "\n";
-        std::cout << oss2.str();
+        StdOut() << name_for_debug << " after pemeate sleep" << "\n";
 
         finish_task.fetch_add(1, std::memory_order_relaxed);
     }
@@ -117,9 +109,9 @@ class NodeM: public Node {
         sub_graph->create_edges(new NodeDemo(name_for_debug + "-5-", 5), {node_1.get(), node_1.get()});
 
         sub_graph->create_edges([](Graph* sub_graph){
-          std::cout << "lambda start\n";
+          StdOut() << "lambda start\n";
           usleep(1);
-          std::cout << "lambda end\n"; 
+          StdOut() << "lambda end\n"; 
         }, {});
 
         // do somethings
@@ -139,9 +131,9 @@ class NodeM: public Node {
         // do somethings
 
         ScheduleAspect::wait_graph(sub_graph, name_for_debug + "ccc");  // 等待子任务全部执行完，主要是防止野指针等
-        std::cout << "clear\n";
+        StdOut() << "clear\n";
         sub_graph->clear_graph();
-        std::cout << "end\n";
+        StdOut() << "end\n";
 
         finish_task.fetch_add(1, std::memory_order_relaxed);
     }
@@ -157,11 +149,11 @@ int run(int thread_cnt) {
     Node::block_thread_for_group(g);
     delete g;
     
-    std::cout << "wait" << std::endl;
+    StdOut() << "wait";
     Schedule::destroy();
-    std::cout << "end" << std::endl;
+    StdOut() << "end";
 
-    std::cout << "new task:" << new_task << "   finish_task:" << finish_task << "\n";
+    StdOut() << "new task:" << new_task << "   finish_task:" << finish_task << "\n";
     return 0;
 }
 }}

@@ -107,7 +107,7 @@ void Schedule::destroy() {
         for (auto r_node: required_nodes) {
             if (r_node->loose_get_status() != RunningStatus::Recoverable) {
                 #ifdef QUIET_FLOW_DEBUG
-                std::cout << (unsigned long int)r_node << "\n";
+                StdOut() << (unsigned long int)r_node << "\n";
                 #endif
                 running = true;
                 break;
@@ -258,15 +258,13 @@ void Schedule::record_task_finish() {
 
     #ifdef QUIET_FLOW_DEBUG
     if (finish_cnt % 64 == 0) {
-        std::ostringstream oss;
+        StdOut oss;
         oss << "quiet_flow.status--->";
         oss << "#idle_worker_num:" << idle_worker_num_;
         oss << "#pending_worker_num:" <<  Node::pending_worker_num_;
         oss << "#ready_worker_num:" << ready_worker_num_;
         oss << "#task_queue_length:" << inner_schedule->task_queue->size();
         oss << "#pending_context_num_:" << ExecutorContext::pending_context_num_;
-        oss << "\n";
-        std::cout << oss.str();
     }
     #endif
 }
@@ -274,7 +272,7 @@ void Schedule::record_task_finish() {
 ExectorItem* Schedule::safe_get_cur_exec() {
     if (ExectorItem::thread_idx_ < 0 || ExectorItem::thread_idx_ > thread_exec_vec.size()) {
         #ifdef QUIET_FLOW_DEBUG
-        std::cout << "thread_idx:" << ExectorItem::thread_idx_ << std::endl;
+        StdOut() << "thread_idx:" << ExectorItem::thread_idx_;
         #endif
         return nullptr;
     }

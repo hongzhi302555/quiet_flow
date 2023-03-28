@@ -13,15 +13,17 @@ namespace free_lock{
 
 LimitQueue::LimitQueue(uint64_t size) {
   capacity = align_size(size);
+  capacity_bitmap = capacity - 1;
+
   #ifdef QUIET_FLOW_DEBUG
   vec.resize(capacity);
   #else
   vec = (void**)(calloc(capacity, sizeof(void*)));
   #endif
   flag_vec = (std::atomic<uint64_t>*)(calloc(capacity, sizeof(std::atomic<uint64_t>)));
-  flag_vec[0] = 0xf;  // 很关键，极端 case 下，会误判 flag
-  
-  capacity_bitmap = capacity - 1;
+  for (size_t i=0; i < capacity; i++) {
+    flag_vec[i] = i - capacity_bitmap;
+  }
 
   read = 0;
   read_missed = 0;
@@ -71,11 +73,7 @@ bool LimitQueue::try_dequeue(void** item) {
       std::atomic_signal_fence(std::memory_order_acquire);
       QuietFlowAssert(*item != nullptr)
       vec[idx] = nullptr;
-      if (idx) {
-        flag_vec[idx].store(0, std::memory_order_release);
-      } else {
-        flag_vec[idx].store(0xf, std::memory_order_release);
-      }
+      flag_vec[idx].store(read_+1, std::memory_order_release);
       return true;
     } else {
       read_missed.fetch_add(1, std::memory_order_release);
@@ -95,11 +93,7 @@ bool LimitQueue::try_enqueue(void* item) {
     if (!is_full(read_, write_ahead_-write_missed_)) {
       uint64_t write_ = write.fetch_add(1, std::memory_order_acq_rel);
       auto idx = write_ & capacity_bitmap;
-      if (idx) {
-        while (flag_vec[idx].load(std::memory_order_acquire) != 0);
-      } else {
-        while (flag_vec[idx].load(std::memory_order_acquire) != 0xf);
-      }
+      while (flag_vec[idx].load(std::memory_order_acquire) != (write_-capacity_bitmap));
       /**
        * flag_WRITE_head
        * read.fetch_add 之后未必就能写了，参考 flag_READ_head
