@@ -1,13 +1,12 @@
 #pragma once
 
 #include <atomic>
+#include "head/util.h"
 #include "head/queue/interface.h"
 
 namespace quiet_flow{
 namespace queue{
 namespace free_lock{
-
-using uint64_t = unsigned long long;
 
 class LimitQueue: public AbstractQueue {
   private:

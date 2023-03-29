@@ -247,7 +247,7 @@ void Schedule::idle_worker_add() {
 
 void Schedule::record_task_finish() {
     static int finish_cnt = 0;
-    if (finish_cnt % 64 == 0) {
+    if (finish_cnt % 4096 == 0) {
         quiet_flow::Metrics::emit_timer("quiet_flow.status.idle_worker_num", idle_worker_num_-1);
         quiet_flow::Metrics::emit_timer("quiet_flow.status.pending_worker_num", Node::pending_worker_num_);
         quiet_flow::Metrics::emit_timer("quiet_flow.status.ready_worker_num", ready_worker_num_);
@@ -257,7 +257,7 @@ void Schedule::record_task_finish() {
     finish_cnt += 1;
 
     #ifdef QUIET_FLOW_DEBUG
-    if (finish_cnt % 64 == 0) {
+    if (finish_cnt % 4096 == 0) {
         StdOut oss;
         oss << "quiet_flow.status--->";
         oss << "#idle_worker_num:" << idle_worker_num_;

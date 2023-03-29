@@ -1,8 +1,7 @@
 #include <atomic>
+#include "head/util.h"
 
 namespace quiet_flow{
-
-using uint64_t = unsigned long long;
 
 class LocalErrorRate {
 private:

@@ -12,9 +12,9 @@
 
 namespace quiet_flow{
 
-using uint64_t = unsigned long long;
-using int64_t = signed long long;
-using int32_t = signed long;
+using uint64_t = unsigned long;
+using int64_t = signed long;
+using int32_t = signed;
 
 enum class RunningStatus{
     Initing,

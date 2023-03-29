@@ -37,8 +37,7 @@ cc_library(
         "-Wno-unused-parameter", "-Wno-unused-variable",
         "-Wno-comment", "-ftemplate-depth=9000",
         "-fopenmp",
-        "-D QUIET_FLOW_QUICK_BUG",
-        "-D QUIET_FLOW_DEBUG",
+        # "-D QUIET_FLOW_DEBUG",
     ],
 )
 

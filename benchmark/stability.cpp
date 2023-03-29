@@ -158,7 +158,8 @@ int run(int thread_cnt) {
 }
 }}
 
-int main() {
+int main(int argc, char** argv) {
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     quiet_flow::Metrics::init("test.yhz", "test.yhz");
     for (int i=0; i<1000; i++) {
         quiet_flow::test::run(10);
