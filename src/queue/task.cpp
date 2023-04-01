@@ -11,7 +11,7 @@
 #include <iostream>
 
 DEFINE_int32(qf_spin_cycle, 100, "spin for consume task");
-DEFINE_int32(qf_big_spin, 1, "spin for consume task");
+DEFINE_int32(qf_sig_hold, 10000, "hold sigal us");
 
 namespace quiet_flow{
 namespace queue{
@@ -42,26 +42,26 @@ void TaskQueue::signal() {
   }
 }
 
-bool TaskQueue::big_spin_get(void** item) {
-  bool b = false;
-
+bool TaskQueue::spin_hold() {
   auto old_count = big_spin_count.fetch_add(1, std::memory_order_release); 
-  if (old_count < FLAGS_qf_big_spin) {
-    b = try_get(item, 100000);
+  if (old_count == 0) {
+    usleep(FLAGS_qf_sig_hold);
   }
 
   old_count = big_spin_count.fetch_sub(1, std::memory_order_release); 
   if (old_count == 1) {
     // 补发信号
     int32_t cur_count = m_count.load(std::memory_order_release);
+    cur_count += 1;
     if (cur_count < 0) {
       #ifdef QUIET_FLOW_DEBUG
       StdOut() << ExectorItem::thread_idx_ << " task_queue signal_2:" << big_spin_count << "VS" << cur_count;
       #endif
       ::syscall(SYS_futex, high_m_count, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), -1*cur_count);
     }
+    return true;
   }
-  return b;
+  return false;
 }
 
 bool TaskQueue::try_get(void** item, int spin) {
@@ -86,7 +86,9 @@ void TaskQueue::wait() {
     m_count.fetch_add(1, std::memory_order_release);
     return;
   }
-  ::syscall(SYS_futex, high_m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), 0, nullptr);
+  if (not spin_hold()) {
+    ::syscall(SYS_futex, high_m_count, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), 0, nullptr);
+  }
   #ifdef QUIET_FLOW_DEBUG
   StdOut() << ExectorItem::thread_idx_ << "task_queue wait_2:"  << big_spin_count << "VS" << m_count << "high" << *high_m_count << "OLD" << cur_count;
   #endif
@@ -105,11 +107,9 @@ bool TaskQueue::enqueue(void* item) {
 }
 
 void TaskQueue::wait_dequeue(void** item) {
-  m_count.fetch_add(1, std::memory_order_release);
+  spin_hold();
 
-  if (big_spin_get(item)) {
-    return;
-  }
+  m_count.fetch_add(1, std::memory_order_release);
   if (try_get(item, FLAGS_qf_spin_cycle)) {
     return;
   }

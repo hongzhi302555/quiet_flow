@@ -20,7 +20,7 @@ class TaskQueue {
     void signal();
     void wait();
     bool try_get(void** item, int spin);
-    bool big_spin_get(void** item);
+    bool spin_hold();
 
   public:
     TaskQueue(uint64_t size);
