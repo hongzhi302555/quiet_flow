@@ -1,3 +1,7 @@
+#include <linux/futex.h> // FUTEX_*
+#include <sys/syscall.h> // __NR_futex
+#include <unistd.h>      // syscall
+
 #include <atomic>
 #include <unistd.h>
 #include <iostream>
@@ -64,7 +68,20 @@ bool LimitQueue::try_dequeue(void** item) {
        */
       uint64_t read_ = read.fetch_add(1, std::memory_order_acq_rel);
       auto idx = read_ & capacity_bitmap;
-      while (flag_vec[idx].load(std::memory_order_acquire) != read_);
+      auto cur_version = 0;
+      while (true) {
+        int i = 100;
+        while ((i--)>0) {
+          cur_version = flag_vec[idx].load(std::memory_order_acquire);
+          if (cur_version == read_) goto READY_READY;
+        }
+        ::syscall(SYS_futex, flag_vec+idx, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), cur_version, nullptr);
+        #ifdef QUIET_FLOW_DEBUG
+        auto target_ptr = (uint64_t*)(flag_vec+idx);
+        StdOut() << "LimitQueue: wait read ptr:" << target_ptr << " cur_version:" << cur_version << " target:" << read_;
+        #endif
+      }
+READY_READY:
       /**
        * flag_READ_tail
        * write.fetch_add 之后未必就能读了，参考 flag_WRITE_tail
@@ -74,6 +91,11 @@ bool LimitQueue::try_dequeue(void** item) {
       QuietFlowAssert(*item != nullptr)
       vec[idx] = nullptr;
       flag_vec[idx].store(read_+1, std::memory_order_release);
+      ::syscall(SYS_futex, flag_vec+idx, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), -1);
+      #ifdef QUIET_FLOW_DEBUG
+      auto target_ptr = (uint64_t*)(flag_vec+idx);
+      StdOut() << "LimitQueue: wake read ptr:" << target_ptr << " version:" << read_+1;
+      #endif
       return true;
     } else {
       read_missed.fetch_add(1, std::memory_order_release);
@@ -93,7 +115,20 @@ bool LimitQueue::try_enqueue(void* item) {
     if (!is_full(read_, write_ahead_-write_missed_)) {
       uint64_t write_ = write.fetch_add(1, std::memory_order_acq_rel);
       auto idx = write_ & capacity_bitmap;
-      while (flag_vec[idx].load(std::memory_order_acquire) != (write_-capacity_bitmap));
+      uint64_t cur_version = 0, target_version = (write_-capacity_bitmap);
+      while (true) {
+        int i = 100;
+        while ((i--)>0) {
+          cur_version = flag_vec[idx].load(std::memory_order_acquire);
+          if (cur_version == target_version) goto WRITE_READY;
+        }
+        ::syscall(SYS_futex, flag_vec+idx, (FUTEX_WAIT | FUTEX_PRIVATE_FLAG), cur_version, nullptr);
+        #ifdef QUIET_FLOW_DEBUG
+        auto target_ptr = (uint64_t*)(flag_vec+idx);
+        StdOut() << "LimitQueue: wait write ptr:" << target_ptr << " cur_version:" << cur_version << " target:" << target_version;
+        #endif
+      }
+WRITE_READY:
       /**
        * flag_WRITE_head
        * read.fetch_add 之后未必就能写了，参考 flag_READ_head
@@ -105,6 +140,11 @@ bool LimitQueue::try_enqueue(void* item) {
        * read.fetch_add 之后未必就能写了，参考 flag_READ_tail
        */
       flag_vec[idx].store(write_, std::memory_order_release);
+      ::syscall(SYS_futex, flag_vec+idx, (FUTEX_WAKE | FUTEX_PRIVATE_FLAG), -1);
+      #ifdef QUIET_FLOW_DEBUG
+      auto target_ptr = (uint64_t*)(flag_vec+idx);
+      StdOut() << "LimitQueue: wake write ptr:" << target_ptr << " version:" << write_;
+      #endif
       return true;
     } else {
       write_missed.fetch_add(1, std::memory_order_release);
