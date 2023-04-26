@@ -1,10 +1,9 @@
-#include <cpputil/common/timer/time_cost.h>
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <thread>
 #include <iostream>
 #include "head/node.h"
 #include "head/schedule.h"
+#include "head/time_cost.h"
 #include "head/cpp3rd/metrics.h"
 #include "fibonacci.h"
 
@@ -57,7 +56,7 @@ int main(int argc, char** argv) {
 
     quiet_flow::Schedule::init(FLAGS_executor_num);
 
-    cpputil::TimeCost tc;
+    quiet_flow::TimeCost tc;
     std::vector<std::thread> threads;
     for (auto idx = 0; idx < FLAGS_tnum; ++idx) {
         // run(idx);

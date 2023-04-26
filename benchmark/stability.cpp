@@ -65,7 +65,7 @@ class FutureRPC {
     }
 };
 
-class NodeDemo2: public FollyFutureAspect {
+class NodeDemo2: public FutureAspect {
   private: 
     int sleep_time;
     std::string name_for_debug;
@@ -81,7 +81,7 @@ class NodeDemo2: public FollyFutureAspect {
         usleep(sleep_time);
 
         int r_t;
-        FollyFutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
+        FutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "mmm" + post);       // 等待 future 数据回来
 
         StdOut() << name_for_debug << " after pemeate sleep" << "\n";
 
@@ -122,7 +122,7 @@ class NodeM: public Node {
 
         // require_node(future);  
         int r_t;
-        FollyFutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
+        FutureAspect::require_node(std::move(FutureRPC().query(1)), r_t, -1, name_for_debug + "bbb");       // 等待 future 数据回来
 
         // do somethings
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <gflags/gflags.h>
 #include <atomic>
 #include <mutex>
 #include <unistd.h>
@@ -20,7 +19,7 @@ namespace folly{template<class T>class Future;}
 
 namespace quiet_flow{
 
-class FollyFutureAspect {
+class FutureAspect {
   public: 
     class Assistant: public ScheduleAspect::Assistant {
       public:
@@ -37,7 +36,7 @@ class FollyFutureAspect {
   private: 
     static Assistant* aspect_;
   public: 
-    static FollyFutureAspect::Assistant* get_scheduler() { return aspect_;}
+    static FutureAspect::Assistant* get_scheduler() { return aspect_;}
     template <class T> inline static void require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name="") {
       return aspect_->require_node(std::move(future), f_value, error_value, sub_node_debug_name);
     }
@@ -50,7 +49,7 @@ class FollyFutureAspect {
 };
 
 template <class T>
-void FollyFutureAspect::Assistant::require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name) {
+void FutureAspect::Assistant::require_node(folly::Future<T> &&future, T& f_value, const T& error_value, const std::string& sub_node_debug_name) {
   if (Schedule::safe_get_cur_exec() == nullptr) {
     std::move(future).then(
         [&f_value](T ret_value) mutable {f_value=ret_value;}

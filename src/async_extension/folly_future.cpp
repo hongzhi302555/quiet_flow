@@ -1,4 +1,3 @@
-#include <folly/futures/Future.h>
 #include <cxxabi.h>
 #include "iostream"
 
@@ -6,7 +5,7 @@
 
 namespace quiet_flow{
 
-FollyFutureAspect::Assistant* FollyFutureAspect::aspect_ = new FollyFutureAspect::Assistant();
+FutureAspect::Assistant* FutureAspect::aspect_ = new FutureAspect::Assistant();
 
 class InnerEndNode: public Node {
   public:
@@ -24,7 +23,7 @@ class InnerEndNode: public Node {
     }
 };
 
-Node* FollyFutureAspect::Assistant::make_future(const std::string& debug_name) {
+Node* FutureAspect::Assistant::make_future(const std::string& debug_name) {
     return (new InnerEndNode(debug_name));
 }
 }

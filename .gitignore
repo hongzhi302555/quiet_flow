@@ -6,4 +6,9 @@ fibonacci_dynamic
 fibonacci_static
 stability
 stack_over
+folly_dep
+bin/
+gtest_dep
 lib
+*.o
+*.a

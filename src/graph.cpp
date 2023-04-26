@@ -381,7 +381,7 @@ class LambdaNode: public ReuseNode {
     }
 
   protected:
-    virtual void run(){
+    virtual void run() override {
       lambda_holder();
       ScheduleAspect::wait_graph(this->get_graph());
     }
