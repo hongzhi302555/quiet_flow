@@ -22,7 +22,8 @@ class SelfQueue {
     bool try_enqueue(Node* node) {
         int32_t old_count = m_count.fetch_add(1, std::memory_order_release);
         if (old_count >= 0) {
-            return limit_queue.try_enqueue(node);
+            QuietFlowAssert(limit_queue.try_enqueue(node));
+            return true;
         }
         return false;
     }
