@@ -11,8 +11,8 @@
 #include <thread>
 #include <pthread.h>
 #include <unordered_map>
-#include <folly/futures/Future.h>
 #include "head/cpp3rd/metrics.h"
+#include "head/cpp3rd/folly_future.h"
 
 #include "head/node.h"
 #include "head/schedule.h"

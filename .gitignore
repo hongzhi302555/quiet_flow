@@ -10,5 +10,7 @@ folly_dep
 bin/
 gtest_dep
 lib
+cpp3rdlib
+*.zip
 *.o
 *.a
